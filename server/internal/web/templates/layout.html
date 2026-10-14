@@ -1,0 +1,35 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{block "title" .}}makerApp{{end}} · makerApp</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='7' width='26' height='18' rx='4' fill='%23F54E00'/><rect x='7' y='11' width='18' height='10' rx='1.5' fill='%23111'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/style.css?v={{assetV}}">
+<script src="/static/htmx.min.js" defer></script>
+<script src="/static/app.js?v={{assetV}}" defer></script>
+<script src="/static/data.js?v={{assetV}}" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/"><span class="brand-mark"></span>makerApp</a>
+    {{if .User}}
+    <nav>
+      <a href="/devices" {{if or (hasPrefix .Path "/devices") (hasPrefix .Path "/flash")}}class="on"{{end}}>Devices</a>
+      <a href="/apps" {{if or (hasPrefix .Path "/apps") (hasPrefix .Path "/screens")}}class="on"{{end}}>Apps</a>
+      <a href="/sources" {{if hasPrefix .Path "/sources"}}class="on"{{end}}>Data</a>
+    </nav>
+    <form method="post" action="/logout" class="who">
+      <span class="avatar" title="{{.User.Email}}">{{slice .User.Email 0 1}}</span>
+      <button class="link">Log out</button>
+    </form>
+    {{end}}
+  </div>
+</header>
+<main>{{template "content" .}}</main>
+</body>
+</html>{{end}}

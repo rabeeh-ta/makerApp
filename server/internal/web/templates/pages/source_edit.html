@@ -1,0 +1,112 @@
+{{define "title"}}{{if .Source.ID}}{{.Source.Name}}{{else}}New data source{{end}}{{end}}
+{{define "content"}}
+{{$s := .Source}}
+<div class="page-head">
+  <div><p class="crumbs"><a href="/sources">Data</a> /</p><h1>{{if $s.ID}}{{$s.Name}}{{else}}New data source{{end}}</h1></div>
+  {{if $s.ID}}<form method="post" action="/sources/{{$s.ID}}/delete" onsubmit="return confirm('Delete this source? Screens using it will show empty values.')"><button class="btn danger">Delete</button></form>{{end}}
+</div>
+{{if .Error}}<div class="notice notice-warn">{{.Error}}</div>{{end}}
+
+<div class="grid two editor">
+<form method="post" action="{{if $s.ID}}/sources/{{$s.ID}}{{else}}/sources/new{{end}}" class="card stack" id="source-form">
+  <label>Name<input name="name" value="{{$s.Name}}" placeholder="e.g. Kozhikode weather" required></label>
+
+  <fieldset class="kinds">
+    <legend>Type</legend>
+    <label><input type="radio" name="kind" value="http" {{if eq $s.Kind "http"}}checked{{end}}><b>Request</b></label>
+    <label><input type="radio" name="kind" value="static" {{if eq $s.Kind "static"}}checked{{end}}><b>Fixed data</b></label>
+    <label><input type="radio" name="kind" value="push" {{if eq $s.Kind "push"}}checked{{end}}><b>Webhook</b></label>
+  </fieldset>
+
+  <div data-kind="http" class="stack">
+    <div class="url-bar">
+      <select name="method" id="method">{{range (list "GET" "POST" "PUT" "PATCH")}}<option {{if eq . $s.Method}}selected{{end}}>{{.}}</option>{{end}}</select>
+      <input name="url" id="url" value="{{$s.URL}}" placeholder="https://api.example.com/v1/stats?city=london" spellcheck="false" autocomplete="off">
+    </div>
+
+    <div class="kv-block">
+      <div class="kv-head"><span class="label-like">Query parameters</span></div>
+      <div class="kv-rows" id="params">
+        {{range .SecretKeys}}
+        <div class="kv-row secret">
+          <input name="sk" value="{{.}}" placeholder="name" class="k">
+          <input name="sv" type="password" value="" placeholder="•••••• saved" class="v" autocomplete="off">
+          <button type="button" class="kv-lock on" title="Secret: encrypted, not in the URL">🔒</button>
+          <button type="button" class="kv-del" title="Remove">×</button>
+        </div>
+        {{end}}
+      </div>
+      <button type="button" class="kv-add" data-add="params">+ Add parameter</button>
+    </div>
+
+    <label>Token
+      <input name="auth" type="password" autocomplete="off" placeholder="{{if .HasAuth}}•••••• saved{{else}}Bearer token (optional){{end}}" title="Sent as Authorization: Bearer <token>. A value with a space (e.g. Basic …) is sent as-is.">
+    </label>
+    {{if .HasAuth}}<label class="check small"><input type="checkbox" name="clear_auth" value="1"> Remove the saved token</label>{{end}}
+
+    <div class="kv-block">
+      <div class="kv-head"><span class="label-like">Headers</span></div>
+      <div class="kv-rows" id="headers">
+        {{range .HeaderRows}}
+        <div class="kv-row">
+          <input name="hk" value="{{.K}}" placeholder="Header-Name" class="k">
+          <input name="hv" value="{{.V}}" placeholder="value" class="v">
+          <button type="button" class="kv-del" title="Remove">×</button>
+        </div>
+        {{end}}
+      </div>
+      <button type="button" class="kv-add" data-add="headers">+ Add header</button>
+    </div>
+
+    <label id="body-field">JSON body
+      <textarea name="body" rows="5" class="mono" placeholder='{"query": "..."}' spellcheck="false">{{$s.Body}}</textarea></label>
+
+    <label>Refresh every
+      <select name="interval_sec">{{range .Intervals}}<option value="{{.Sec}}" {{if eq .Sec $s.IntervalSec}}selected{{end}}>{{.Label}}</option>{{end}}</select>
+    </label>
+  </div>
+
+  <div data-kind="static" class="stack">
+    <label>Data
+      <textarea name="static_data" rows="10" class="mono" placeholder='{"note": "Ship it!", "goal": 72}' spellcheck="false">{{.StaticData}}</textarea></label>
+  </div>
+
+  <div data-kind="push" class="stack">
+    <p class="muted small">POST JSON to this URL to update the data.</p>
+    {{if and $s.ID $s.PushToken}}
+    <label>Webhook URL
+      <input readonly value="{{.PushURL}}" class="mono" onclick="this.select()"></label>
+    <pre class="json">curl -X POST {{.PushURL}} \
+  -H 'Content-Type: application/json' \
+  -d '{"value": 42, "label": "Deploys"}'</pre>
+    {{else}}<p class="muted small">Save to get your private webhook URL.</p>{{end}}
+  </div>
+
+  <div class="savebar"><button class="btn btn-lg">{{if $s.ID}}Save{{else}}Save &amp; fetch{{end}}</button></div>
+</form>
+<aside class="stack sticky">
+  {{if $s.ID}}{{template "source_data" .Data}}{{else}}
+  <section class="card templates">
+    <h3>Start from a template</h3>
+    <div class="template-list">
+      {{range $i, $p := .Presets}}
+      <button type="button" class="template-card" data-preset="{{$i}}">
+        <span class="tpl-badge">{{$p.Badge}}</span>
+        <span><strong>{{$p.Name}}</strong><span class="muted small">{{$p.Desc}}</span></span>
+      </button>
+      {{end}}
+    </div>
+  </section>
+  {{end}}
+</aside>
+</div>
+<template id="kv-row-tpl">
+  <div class="kv-row">
+    <input class="k" placeholder="name">
+    <input class="v" placeholder="value">
+    <button type="button" class="kv-lock" title="Make secret">🔒</button>
+    <button type="button" class="kv-del" title="Remove">×</button>
+  </div>
+</template>
+<script>window.PRESETS = {{json .Presets}};</script>
+{{end}}

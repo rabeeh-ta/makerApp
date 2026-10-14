@@ -1,0 +1,93 @@
+{{define "title"}}{{if .Screen.ID}}{{.Screen.Name}}{{else}}New screen{{end}}{{end}}
+{{define "content"}}
+{{$sc := .Screen}}{{$sp := .Spec}}
+<div class="page-head">
+  <div><p class="crumbs"><a href="/apps">Apps</a> /{{if .App}} <a href="/apps/{{.App.ID}}">{{.App.Name}}</a> /{{end}}</p><h1>{{if $sc.ID}}{{$sc.Name}}{{else}}New screen{{end}}</h1></div>
+  {{if $sc.ID}}<form method="post" action="/screens/{{$sc.ID}}/delete" onsubmit="return confirm('Delete this screen?')"><button class="btn danger">Delete</button></form>{{end}}
+</div>
+{{if .Error}}<div class="notice notice-warn">{{.Error}}</div>{{end}}
+{{if .Saved}}
+  {{if .Showing}}
+  <div class="notice">Saved. {{range $i, $d := .Showing}}{{if $i}}, {{end}}<b>{{$d.Name}}</b> {{if $d.Online}}updated now{{else}}(offline, it updates when it reconnects){{end}}{{end}}.</div>
+  {{else}}
+  <div class="notice">Saved.</div>
+  {{end}}
+{{end}}
+
+<div class="grid two editor">
+<form method="post" action="{{if $sc.ID}}/screens/{{$sc.ID}}{{else}}/screens/new{{end}}" class="stack" id="screen-form"
+      hx-post="/screens/preview" hx-trigger="input delay:300ms, change, change from:#source-pick" hx-target="#preview" hx-swap="innerHTML">
+  <section class="card stack">
+    {{if not $sc.ID}}
+    <label>App
+      <select name="app">
+        {{range .Apps}}<option value="{{.ID}}" {{if eq .ID $sc.AppID}}selected{{end}}>{{.Name}}</option>{{end}}
+        <option value="new" {{if not $sc.AppID}}selected{{end}}>+ New app, named after this screen</option>
+      </select>
+    </label>
+    {{end}}
+    <label>Screen name<input name="name" value="{{$sc.Name}}" placeholder="e.g. Signups"></label>
+    <fieldset class="layouts">
+      <legend>Layout</legend>
+      {{range layouts}}
+      <label class="layout-opt"><input type="radio" name="layout" value="{{.}}" {{if eq . $sc.Layout}}checked{{end}}><span class="lo lo-{{.}}"></span>{{layoutName .}}</label>
+      {{end}}
+    </fieldset>
+  </section>
+
+  <section class="card stack">
+    <h3>Content</h3>
+    <p class="muted small">Type text or click a field on the right. <span title="| num  | compact  | money  | pct  | pct100  | fixed:1  | sum  | len  | ago  | date   ·   @ago = when fetched" class="hint">Formats</span></p>
+    <div class="row">
+      <label class="grow">Title<input name="title" value="{{$sp.Title}}" data-tpl></label>
+      <label class="shrink">Accent<input type="color" name="accent" value="{{if $sp.Accent}}{{$sp.Accent}}{{else}}#F54E00{{end}}"></label>
+      <label class="shrink">Background<input type="color" name="bg" value="{{if $sp.BG}}{{$sp.BG}}{{else}}#000000{{end}}"></label>
+    </div>
+    <div data-layout="big_number spark progress"><label>Main value<input name="value" value="{{$sp.Value}}" data-tpl placeholder="{{"{{"}} results.0.0 | compact {{"}}"}}"></label></div>
+    <div data-layout="big_number progress"><label>Subtitle<input name="sub" value="{{$sp.Sub}}" data-tpl placeholder="updated {{"{{"}} @ago {{"}}"}}"></label></div>
+    <div data-layout="big_number"><label>Subtitle color
+      <select name="sub_color">
+        <option value="" {{if eq $sp.SubColor ""}}selected{{end}}>Gray</option>
+        <option value="auto" {{if eq $sp.SubColor "auto"}}selected{{end}}>Green if it starts with +, red if it starts with -</option>
+        <option value="#2BB673" {{if eq $sp.SubColor "#2BB673"}}selected{{end}}>Green</option>
+        <option value="#F04438" {{if eq $sp.SubColor "#F04438"}}selected{{end}}>Red</option>
+        <option value="#F54E00" {{if eq $sp.SubColor "#F54E00"}}selected{{end}}>Orange</option>
+      </select></label></div>
+    <div data-layout="text"><label>Text<textarea name="body" rows="5" data-tpl>{{$sp.Body}}</textarea></label></div>
+    <div data-layout="list" class="stack">
+      <label>List<input name="items_path" value="{{$sp.ItemsPath}}" data-tpl data-raw></label>
+      <div class="row">
+        <label class="grow">Row label<input name="item_label" value="{{$sp.ItemLabel}}" data-tpl placeholder="{{"{{"}} properties.dealname {{"}}"}}"></label>
+        <label class="grow">Row value<input name="item_value" value="{{$sp.ItemValue}}" data-tpl placeholder="{{"{{"}} properties.amount | money {{"}}"}}"></label>
+        <label class="shrink">Max rows<input type="number" name="max_items" value="{{$sp.MaxItems}}" min="1" max="30"></label>
+      </div>
+    </div>
+    <div data-layout="spark"><label>Series<input name="series_path" value="{{$sp.SeriesPath}}" data-tpl data-raw></label></div>
+    <div data-layout="progress" class="row">
+      <label class="grow">Progress value<input name="pct_value" value="{{$sp.PctValue}}" data-tpl placeholder="{{"{{"}} total {{"}}"}}"></label>
+      <label class="grow">Out of (target)<input name="pct_max" value="{{$sp.PctMax}}" data-tpl placeholder="100"></label>
+    </div>
+  </section>
+
+  <div class="savebar"><button class="btn btn-lg" type="submit">Save</button></div>
+</form>
+
+<aside class="stack sticky">
+  <section class="card">
+    <h3>Preview</h3>
+    <div id="preview">{{template "device_screen" (dict "S" .Preview "Big" true)}}</div>
+  </section>
+  <section class="card explorer">
+    {{template "device_fields"}}
+    {{/* Part of the form via form=, so it saves and refreshes the preview like the fields on the left. */}}
+    <label class="source-pick">Data source
+      <select id="source-pick" name="source_id" form="screen-form" hx-get="/screens/explorer" hx-trigger="change" hx-target="#explorer" hx-swap="outerHTML" hx-include="this">
+        <option value="">None (fixed text)</option>
+        {{range .Sources}}<option value="{{.ID}}" {{if eq .ID $sc.SourceID}}selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </label>
+    {{template "explorer" .Explorer}}
+  </section>
+</aside>
+</div>
+{{end}}

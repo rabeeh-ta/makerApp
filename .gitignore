@@ -1,0 +1,5 @@
+/bin/
+/data/
+firmware/.pio/
+.DS_Store
+.env.deploy

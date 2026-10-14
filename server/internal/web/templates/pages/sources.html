@@ -1,0 +1,27 @@
+{{define "title"}}Data sources{{end}}
+{{define "content"}}
+<div class="page-head">
+  <div><h1>Data sources</h1></div>
+  <a class="btn" href="/sources/new">New source</a>
+</div>
+{{if .Sources}}
+<div class="table card">
+  <div class="tr th"><span>Name</span><span>Type</span><span>Refresh</span><span>Last update</span><span>Used by</span></div>
+  {{range .Sources}}
+  <a class="tr" href="/sources/{{.ID}}">
+    <span><strong>{{.Name}}</strong>{{if eq .Kind "http"}}<br><span class="muted small mono trunc">{{.Method}} {{.URL}}</span>{{end}}</span>
+    <span>{{if eq .Kind "http"}}Request{{else if eq .Kind "static"}}Fixed data{{else}}Webhook{{end}}</span>
+    <span>{{if eq .Kind "http"}}every {{.IntervalSec}}s{{else}}—{{end}}</span>
+    <span>{{if .LastError}}<span class="badge off">error</span>{{else}}{{ago .LastFetchedAt}}{{end}}</span>
+    <span>{{.ScreenCount}} screen{{if ne .ScreenCount 1}}s{{end}}</span>
+  </a>
+  {{end}}
+</div>
+{{else}}
+<div class="card empty">
+  <h3>No data sources yet</h3>
+  
+  <a class="btn" href="/sources/new">Add a data source</a>
+</div>
+{{end}}
+{{end}}

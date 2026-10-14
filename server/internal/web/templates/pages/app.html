@@ -1,0 +1,92 @@
+{{define "title"}}{{.App.Name}}{{end}}
+{{define "content"}}
+{{$app := .App}}
+<div class="page-head">
+  <div><p class="crumbs"><a href="/apps">Apps</a> /</p><h1>{{$app.Name}}</h1></div>
+  <form method="post" action="/apps/{{$app.ID}}/delete" onsubmit="return confirm('Delete “{{$app.Name}}” and its screens? Boards with it installed lose it.')"><button class="btn danger">Delete app</button></form>
+</div>
+{{if eq .Saved "1"}}<div class="notice">Saved. Boards with this app have the update.</div>{{end}}
+{{if eq .Saved "added"}}<div class="notice">Screen added.</div>{{end}}
+{{if eq .Saved "published"}}<div class="notice">Published. Anyone can find it under All apps and install it.</div>{{end}}
+{{if eq .Saved "unpublished"}}<div class="notice">Unpublished. It's off the list and off other people's boards.</div>{{end}}
+{{if .Error}}<div class="notice notice-warn">{{.Error}}</div>{{end}}
+
+<div class="grid two wide-left">
+  <section>
+    <div class="row between section-head">
+      <span class="muted small">On the board, the top and bottom buttons move between these screens. The middle button goes back to the Apps drawer.</span>
+      <a class="btn small" href="/screens/new?app={{$app.ID}}">New screen</a>
+    </div>
+    {{if .Screens}}
+    <div class="grid cards">
+      {{range .Screens}}
+      <div class="card screen-card">
+        <a class="screen-link" href="/screens/{{.S.ID}}">
+          <div class="device-thumb">{{template "device_screen" (dict "S" .S)}}</div>
+          <div class="row between"><strong>{{.S.Name}}</strong><span class="muted small">{{layoutName .S.Layout}}</span></div>
+        </a>
+        <div class="card-actions">
+          <form method="post" action="/apps/{{$app.ID}}/screens/{{.S.ID}}/move"><input type="hidden" name="dir" value="up"><button class="btn ghost small icon" {{if .First}}disabled{{end}} title="Move earlier">↑</button></form>
+          <form method="post" action="/apps/{{$app.ID}}/screens/{{.S.ID}}/move"><input type="hidden" name="dir" value="down"><button class="btn ghost small icon" {{if .Last}}disabled{{end}} title="Move later">↓</button></form>
+          <span class="grow"></span>
+          <a class="btn ghost small" href="/screens/{{.S.ID}}">Edit</a>
+          <form method="post" action="/screens/{{.S.ID}}/delete" onsubmit="return confirm('Delete “{{.S.Name}}”?')"><button class="btn danger small">Delete</button></form>
+        </div>
+      </div>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="card empty">
+      <h3>No screens yet</h3>
+      <p class="muted">Add a screen to show data from a source.</p>
+      <a class="btn" href="/screens/new?app={{$app.ID}}">New screen</a>
+    </div>
+    {{end}}
+  </section>
+
+  <aside class="stack">
+    <section class="card">
+      <h3>App</h3>
+      <form method="post" action="/apps/{{$app.ID}}" class="stack">
+        <label>Name<input name="name" value="{{$app.Name}}" maxlength="40" required></label>
+        <label title="Turns to the next screen when nobody has pressed a button for this long. Needs 2 or more screens.">Cycle screens
+          <select name="cycle_sec">{{range .CycleOpts}}<option value="{{.}}" {{if eq . $app.CycleSec}}selected{{end}}>{{cycleName .}}</option>{{end}}</select>
+        </label>
+        <button class="btn">Save</button>
+      </form>
+    </section>
+    <section class="card">
+      <h3>Publish</h3>
+      {{if $app.PublishedAt}}
+      <p class="small row public-row">Public as {{template "byline" (dict "By" .Username "Installs" .Installs)}}</p>
+      <p class="muted small">{{$app.Description}}</p>
+      <p class="muted small">Changes you make reach everyone's boards right away.</p>
+      <form method="post" action="/apps/{{$app.ID}}/unpublish" onsubmit="return confirm('Unpublish “{{$app.Name}}”? It comes off the list and off other people's boards.')"><button class="btn ghost small">Unpublish</button></form>
+      {{else}}
+      <form method="post" action="/apps/{{$app.ID}}/publish" class="stack">
+        <p class="muted small">Anyone can find it under All apps and install it, straight away.</p>
+        {{if not .Username}}<label>Your public name<input name="username" required pattern="[a-zA-Z0-9_\-]{3,20}" maxlength="20" placeholder="e.g. rabeeh" autocomplete="username"></label>{{end}}
+        <label>Short description<input name="description" required maxlength="140" value="{{$app.Description}}" placeholder="What it shows"></label>
+        {{if .Sources}}<p class="warn small">Everyone who installs it sees the data from {{range $i, $s := .Sources}}{{if $i}}, {{end}}“{{$s}}”{{end}}, fetched with your account.</p>{{end}}
+        <button class="btn small">Publish{{if .Username}} as @{{.Username}}{{end}}</button>
+      </form>
+      {{end}}
+    </section>
+    <section class="card">
+      <h3>Installed on</h3>
+      {{range .Devices}}
+      <div class="install-row">
+        <span class="grow"><strong>{{.Name}}</strong> <span class="badge {{if .Online}}ok{{else}}off{{end}}">{{if .Online}}Online{{else}}Offline{{end}}</span></span>
+        {{if .Installed}}
+        <form method="post" action="/apps/{{$app.ID}}/uninstall"><input type="hidden" name="device" value="{{.ID}}"><input type="hidden" name="back" value="/apps/{{$app.ID}}"><button class="btn ghost small">Uninstall</button></form>
+        {{else}}
+        <form method="post" action="/apps/{{$app.ID}}/install"><input type="hidden" name="device" value="{{.ID}}"><input type="hidden" name="back" value="/apps/{{$app.ID}}"><button class="btn small">Install</button></form>
+        {{end}}
+      </div>
+      {{else}}
+      <p class="muted small">No boards yet. <a href="/flash">Add one</a>.</p>
+      {{end}}
+    </section>
+  </aside>
+</div>
+{{end}}

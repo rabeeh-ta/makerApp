@@ -1,0 +1,7 @@
+{
+  "name": "lua",
+  "version": "5.4.7",
+  "description": "Lua 5.4.7 from lua.org, for espHog's downloadable games. Only the core and the base, table, string, math and coroutine libraries are kept; luaconf.h sets LUA_32BITS.",
+  "license": "MIT",
+  "build": { "includeDir": "src", "srcDir": "src" }
+}

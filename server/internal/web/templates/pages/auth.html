@@ -1,0 +1,17 @@
+{{define "title"}}{{if eq .Mode "signup"}}Create account{{else}}Log in{{end}}{{end}}
+{{define "content"}}
+<section class="narrow card">
+  <h1>{{if eq .Mode "signup"}}Create your account{{else}}Welcome back{{end}}</h1>
+  {{if .Error}}<div class="notice notice-warn">{{.Error}}</div>{{end}}
+  <form method="post" action="/{{.Mode}}" class="stack">
+    <input type="hidden" name="next" value="{{.Next}}">
+    <label>Email<input type="email" name="email" value="{{.Email}}" required autofocus autocomplete="email"></label>
+    <label>Password<input type="password" name="password" required minlength="{{if eq .Mode "signup"}}8{{else}}1{{end}}" autocomplete="{{if eq .Mode "signup"}}new-password{{else}}current-password{{end}}"></label>
+    <button class="btn">{{if eq .Mode "signup"}}Create account{{else}}Log in{{end}}</button>
+  </form>
+  <p class="muted small">
+    {{if eq .Mode "signup"}}Already have an account? <a href="/login">Log in</a>
+    {{else if .AllowSignup}}New here? <a href="/signup{{if .Next}}?next={{.Next}}{{end}}">Create an account</a>{{end}}
+  </p>
+</section>
+{{end}}

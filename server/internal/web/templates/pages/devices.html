@@ -1,0 +1,40 @@
+{{define "title"}}Devices{{end}}
+{{define "content"}}
+<div class="page-head">
+  <div><h1>Devices</h1></div>
+  {{if .HasDevice}}<a class="btn" href="/flash">Add a device</a>{{end}}
+</div>
+
+{{if not (and .HasDevice .HasSource .HasScreen .Installed)}}
+<section class="card onboarding">
+  <div>
+    <h3>Get started</h3>
+  </div>
+  <ol class="checklist">
+    <li class="{{if .HasDevice}}done{{end}}">
+      <span class="tick"></span>
+      <div><strong>Add your board</strong></div>
+      {{if not .HasDevice}}<a class="btn small" href="/flash">Add device</a>{{end}}
+    </li>
+    <li class="{{if .HasSource}}done{{end}}">
+      <span class="tick"></span>
+      <div><strong>Connect some data</strong></div>
+      {{if not .HasSource}}<a class="btn small {{if not .HasDevice}}ghost{{end}}" href="/sources/new">Add data</a>{{end}}
+    </li>
+    <li class="{{if .HasScreen}}done{{end}}">
+      <span class="tick"></span>
+      <div><strong>Build an app</strong></div>
+      {{if not .HasScreen}}<a class="btn small {{if not .HasSource}}ghost{{end}}" href="/apps">New app</a>{{end}}
+    </li>
+    <li class="{{if .Installed}}done{{end}}">
+      <span class="tick"></span>
+      <div><strong>Install it on your board</strong></div>
+      {{if not .Installed}}<a class="btn small {{if not .HasScreen}}ghost{{end}}" href="{{if .FirstDevice}}/devices/{{.FirstDevice}}{{else}}/flash{{end}}">Install</a>{{end}}
+    </li>
+  </ol>
+</section>
+{{end}}
+
+{{if .HasDevice}}{{template "device_cards" .Devices}}{{end}}
+<p class="muted small footnote">Board showing a 6-digit code? <a href="/pair">Enter it here</a>.</p>
+{{end}}
