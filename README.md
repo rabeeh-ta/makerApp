@@ -210,8 +210,6 @@ espHog's firmware uses the chip's built-in USB serial, so later re-flashes from 
 site reset the board automatically. Updates can also go over WiFi from the device
 page (**Update firmware**).
 
-The original CircuitPython files from this board are in `backup/`.
-
 ## Layout
 
 ```
@@ -246,3 +244,7 @@ Server → device: `state {name, brightness, flip, ox, oy, tz, apps[{id, name, c
 A device proves itself with a secret it generates on first boot. Once claimed,
 a device with the same ID but a different secret is refused unless it carries a
 claim from the same owner, which happens when the owner re-flashes it from the site.
+
+## License
+
+MIT, see `LICENSE`. Code from other projects is listed in `THIRD_PARTY_NOTICES.md`.

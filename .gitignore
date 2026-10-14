@@ -1,5 +1,6 @@
 /bin/
 /data/
+/backup/
 firmware/.pio/
 .DS_Store
 .env.deploy
