@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Loading, Notice, Spinner } from '../components/common'
+import { PairCard } from '../components/PairForm'
 import { get, post } from '../lib/api'
 import { useTitle } from '../lib/format'
 import { Link, useData, useInterval, useLocation } from '../lib/router'
@@ -33,6 +34,7 @@ function Picker({ boards }: { boards: Board[] }) {
           <p className="muted">Which board are you setting up?</p>
         </div>
       </div>
+      <PairCard wide />
       <div className="grid cards">
         {boards.map((b) => (
           <Link className="card board-card" to={`/flash?board=${b.ID}`} key={b.ID}>
@@ -185,6 +187,7 @@ function Install({ board, info }: { board: Board; info: Info }) {
         </div>
 
         <aside className="stack sticky">
+          <PairCard />
           <section className="card">
             <h3>Status</h3>
             {claim && <FlashStatus claim={claim.Claim} />}
@@ -206,9 +209,7 @@ function Install({ board, info }: { board: Board; info: Info }) {
               <dt>Can't reach server</dt>
               <dd>Check the internet</dd>
               <dt>6-digit code</dt>
-              <dd>
-                <Link to="/pair">Enter it</Link>
-              </dd>
+              <dd>Type it in the box above</dd>
             </dl>
           </section>
         </aside>

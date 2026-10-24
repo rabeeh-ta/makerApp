@@ -550,3 +550,13 @@ form.stack > .btn { align-self: flex-end; }
 .btn.icon { padding: 5px 9px; }
 .btn:disabled { opacity: .35; cursor: default; }
 .card-actions form { display: inline-flex; }
+
+/* ---- pairing a board that shows a 6-digit code ---- */
+.pair-card { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
+.pair-card h3 { margin-bottom: 4px; }
+.pair-card p { margin: 0; }
+.pair-form { display: flex; gap: 10px; margin-top: 14px; }
+.pair-form .code-input { flex: 1; min-width: 0; font-size: 22px; padding: 7px 10px; }
+.pair-card.wide { display: flex; align-items: center; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap; margin-bottom: 28px; }
+.pair-card.wide .pair-form { margin-top: 0; flex: 0 1 380px; }
+.pair-card .notice { margin: 14px 0 0; }

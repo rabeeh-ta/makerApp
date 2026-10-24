@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ErrorNotice, Spinner } from '../components/common'
+import { PairForm } from '../components/PairForm'
 import { post } from '../lib/api'
 import { useTitle } from '../lib/format'
-import { Link, navigate, useForm, useInterval, useLocation } from '../lib/router'
+import { Link, navigate, useInterval, useLocation } from '../lib/router'
 
 export function Pair() {
   useTitle('Pair a device')
@@ -49,18 +50,10 @@ function PairLink({ device, code }: { device: string; code: string }) {
 }
 
 function PairCode() {
-  const { error, busy, submit } = useForm()
   return (
     <>
       <p className="muted">Enter the 6-digit code shown on the board.</p>
-      <ErrorNotice error={error} />
-      <form onSubmit={submit('/api/pair')} className="stack">
-        <label>
-          Code on the screen
-          <input name="code" inputMode="numeric" pattern="[0-9 ]{6,7}" placeholder="123 456" className="code-input" required autoFocus />
-        </label>
-        <button className="btn" disabled={busy}>Pair device</button>
-      </form>
+      <PairForm autoFocus />
       <p className="muted small">
         No code on the screen? <Link to="/flash">Flash the board</Link> first.
       </p>

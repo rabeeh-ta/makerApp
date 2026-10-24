@@ -34,7 +34,12 @@ export function Devices() {
         <div>
           <h1>Devices</h1>
         </div>
-        {d.HasDevice && <Link className="btn" to="/flash">Add a device</Link>}
+        {d.HasDevice && (
+          <div className="row">
+            <Link className="btn ghost" to="/pair">Enter a code</Link>
+            <Link className="btn" to="/flash">Add a device</Link>
+          </div>
+        )}
       </div>
 
       {!(d.HasDevice && d.HasSource && d.HasScreen && d.Installed) && (
@@ -43,7 +48,15 @@ export function Devices() {
             <h3>Get started</h3>
           </div>
           <ol className="checklist">
-            {step(d.HasDevice, 'Add your board', <Link className="btn small" to="/flash">Add device</Link>)}
+            {step(
+              d.HasDevice,
+              'Add your board',
+              // A span: checklist divs are columns.
+              <span className="row">
+                <Link className="btn small ghost" to="/pair">Enter a code</Link>
+                <Link className="btn small" to="/flash">Add device</Link>
+              </span>,
+            )}
             {step(d.HasSource, 'Connect some data', <Link className={d.HasDevice ? 'btn small' : 'btn small ghost'} to="/sources/new">Add data</Link>)}
             {step(d.HasScreen, 'Build an app', <Link className={d.HasSource ? 'btn small' : 'btn small ghost'} to="/apps">New app</Link>)}
             {step(
@@ -83,9 +96,6 @@ export function Devices() {
           </Link>
         </div>
       )}
-      <p className="muted small footnote">
-        Board showing a 6-digit code? <Link to="/pair">Enter it here</Link>.
-      </p>
     </>
   )
 }
