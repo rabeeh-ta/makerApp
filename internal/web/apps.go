@@ -12,7 +12,6 @@ import (
 
 	"makerapp/internal/engine"
 	"makerapp/internal/games"
-	"makerapp/internal/render"
 	"makerapp/internal/store"
 )
 
@@ -27,7 +26,7 @@ type appCard struct {
 	*store.App
 	ScreenCount int
 	Installs    int
-	Preview     *render.Screen
+	Preview     *webScreen
 	On          []*store.Device // devices it's installed on
 }
 
@@ -35,7 +34,7 @@ type appCard struct {
 type listing struct {
 	ID, Name, Desc, By string
 	Installs           int
-	Preview            *render.Screen
+	Preview            *webScreen
 	On                 []*store.Device // the user's devices it's installed on
 }
 
@@ -46,14 +45,13 @@ func (s *Server) listings(r *http.Request, on map[string][]*store.Device) []list
 	for _, a := range engine.Catalog {
 		p := s.eng.CatalogPreview(a.ID)
 		out = append(out, listing{ID: a.ID, Name: a.Name, Desc: a.Desc, By: a.Publisher, Installs: counts[a.ID],
-			Preview: &p, On: on[a.ID]})
+			Preview: toWeb(p), On: on[a.ID]})
 	}
 	published, _ := s.st.PublishedApps(r.Context())
 	for _, p := range published {
 		l := listing{ID: p.ID, Name: p.Name, Desc: p.Description, By: p.Publisher, Installs: counts[p.ID], On: on[p.ID]}
 		if screens, _ := s.st.AppScreens(r.Context(), p.ID); len(screens) > 0 {
-			pv := s.eng.PreviewScreen(r.Context(), screens[0], nil)
-			l.Preview = &pv
+			l.Preview = toWeb(s.eng.PreviewScreen(r.Context(), screens[0], nil))
 		}
 		out = append(out, l)
 	}
@@ -61,7 +59,7 @@ func (s *Server) listings(r *http.Request, on map[string][]*store.Device) []list
 	return out
 }
 
-func (s *Server) appsPage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) apps(w http.ResponseWriter, r *http.Request) {
 	u := currentUser(r)
 	apps, err := s.st.UserApps(r.Context(), u.ID)
 	if notFound(w, err) {
@@ -75,12 +73,11 @@ func (s *Server) appsPage(w http.ResponseWriter, r *http.Request) {
 		screens, _ := s.st.AppScreens(r.Context(), a.ID)
 		c := appCard{App: a, ScreenCount: len(screens), Installs: counts[a.ID], On: on[a.ID]}
 		if len(screens) > 0 {
-			p := s.eng.PreviewScreen(r.Context(), screens[0], nil)
-			c.Preview = &p
+			c.Preview = toWeb(s.eng.PreviewScreen(r.Context(), screens[0], nil))
 		}
 		cards = append(cards, c)
 	}
-	s.render(w, r, "apps", map[string]any{"Apps": cards, "Public": s.listings(r, on), "Devices": devices,
+	writeJSON(w, http.StatusOK, map[string]any{"Apps": cards, "Public": s.listings(r, on), "Devices": devices,
 		"Username": u.Username})
 }
 
@@ -104,18 +101,18 @@ func (s *Server) newApp(w http.ResponseWriter, r *http.Request) {
 	}
 	a := &store.App{UserID: u.ID, Name: name}
 	if err := s.st.SaveApp(r.Context(), a); err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	// Made from a device page: install it there right away.
 	if d, err := s.st.UserDevice(r.Context(), u.ID, r.FormValue("device")); err == nil {
 		if err := s.st.InstallApp(r.Context(), d.ID, a.ID); err != nil {
-			http.Error(w, "server error", http.StatusInternalServerError)
+			fail(w, http.StatusInternalServerError, "server error")
 			return
 		}
 		s.eng.PushDevice(r.Context(), d.ID)
 	}
-	http.Redirect(w, r, "/apps/"+a.ID, http.StatusSeeOther)
+	redirect(w, "/apps/"+a.ID)
 }
 
 func (s *Server) loadApp(w http.ResponseWriter, r *http.Request) (*store.App, bool) {
@@ -132,13 +129,11 @@ type deviceInstall struct {
 	Online    bool
 }
 
-func (s *Server) appPage(w http.ResponseWriter, r *http.Request) {
-	if a, ok := s.loadApp(w, r); ok {
-		s.renderApp(w, r, a, "")
+func (s *Server) app(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.loadApp(w, r)
+	if !ok {
+		return
 	}
-}
-
-func (s *Server) renderApp(w http.ResponseWriter, r *http.Request, a *store.App, errMsg string) {
 	screens, _ := s.st.AppScreens(r.Context(), a.ID)
 	// Sources whose data anyone who installs the app would see.
 	var sources []string
@@ -150,7 +145,7 @@ func (s *Server) renderApp(w http.ResponseWriter, r *http.Request, a *store.App,
 	counts, _ := s.st.InstallCounts(r.Context())
 	cards := make([]screenCard, len(screens))
 	for i, sc := range s.eng.PreviewScreens(r.Context(), screens) {
-		cards[i] = screenCard{S: sc, First: i == 0, Last: i == len(screens)-1}
+		cards[i] = screenCard{S: toWeb(sc), First: i == 0, Last: i == len(screens)-1}
 	}
 	devices, _ := s.st.UserDevices(r.Context(), a.UserID)
 	on, _ := s.st.DevicesWithApp(r.Context(), a.ID)
@@ -158,13 +153,11 @@ func (s *Server) renderApp(w http.ResponseWriter, r *http.Request, a *store.App,
 	for i, d := range devices {
 		installs[i] = deviceInstall{Device: d, Installed: slices.Contains(on, d.ID), Online: s.eng.Online(d.ID)}
 	}
-	s.render(w, r, "app", map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"App":       a,
 		"Screens":   cards,
 		"Devices":   installs,
 		"CycleOpts": cycleOpts,
-		"Saved":     r.URL.Query().Get("saved"),
-		"Error":     errMsg,
 		"Username":  currentUser(r).Username,
 		"Installs":  counts[a.ID],
 		"Sources":   sources,
@@ -188,23 +181,23 @@ func (s *Server) publishApp(w http.ResponseWriter, r *http.Request) {
 	if u.Username == "" {
 		name := strings.ToLower(strings.TrimSpace(r.FormValue("username")))
 		if !usernameRe.MatchString(name) || slices.Contains(reservedNames, name) {
-			s.renderApp(w, r, a, "Pick a public name of 3 to 20 letters, digits, - or _.")
+			fail(w, http.StatusBadRequest, "Pick a public name of 3 to 20 letters, digits, - or _.")
 			return
 		}
 		if err := s.st.SetUsername(r.Context(), u.ID, name); errors.Is(err, store.ErrTaken) {
-			s.renderApp(w, r, a, "@"+name+" is taken. Try another name.")
+			fail(w, http.StatusBadRequest, "@"+name+" is taken. Try another name.")
 			return
 		} else if err != nil {
-			http.Error(w, "server error", http.StatusInternalServerError)
+			fail(w, http.StatusInternalServerError, "server error")
 			return
 		}
 	}
 	if screens, _ := s.st.AppScreens(r.Context(), a.ID); len(screens) == 0 {
-		s.renderApp(w, r, a, "Add a screen before publishing.")
+		fail(w, http.StatusBadRequest, "Add a screen before publishing.")
 		return
 	}
 	if a.Description == "" {
-		s.renderApp(w, r, a, "Add a short description, so people know what it shows.")
+		fail(w, http.StatusBadRequest, "Add a short description, so people know what it shows.")
 		return
 	}
 	if len(a.Description) > 140 {
@@ -212,10 +205,10 @@ func (s *Server) publishApp(w http.ResponseWriter, r *http.Request) {
 	}
 	a.PublishedAt = time.Now().Unix()
 	if err := s.st.SaveApp(r.Context(), a); err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
-	http.Redirect(w, r, "/apps/"+a.ID+"?saved=published", http.StatusSeeOther)
+	redirect(w, "/apps/"+a.ID+"?saved=published")
 }
 
 // unpublishApp takes it out of the public list and off other people's boards.
@@ -226,13 +219,13 @@ func (s *Server) unpublishApp(w http.ResponseWriter, r *http.Request) {
 	}
 	devices, err := s.st.Unpublish(r.Context(), a.UserID, a.ID)
 	if err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	for _, d := range devices {
 		s.eng.PushDevice(r.Context(), d)
 	}
-	http.Redirect(w, r, "/apps/"+a.ID+"?saved=unpublished", http.StatusSeeOther)
+	redirect(w, "/apps/"+a.ID+"?saved=unpublished")
 }
 
 func (s *Server) saveApp(w http.ResponseWriter, r *http.Request) {
@@ -245,11 +238,11 @@ func (s *Server) saveApp(w http.ResponseWriter, r *http.Request) {
 	}
 	a.CycleSec = clamp(atoi(r.FormValue("cycle_sec"), a.CycleSec), 0, 3600)
 	if err := s.st.SaveApp(r.Context(), a); err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	s.eng.PushApp(r.Context(), a.ID)
-	http.Redirect(w, r, "/apps/"+a.ID+"?saved=1", http.StatusSeeOther)
+	redirect(w, "/apps/"+a.ID+"?saved=1")
 }
 
 func (s *Server) deleteApp(w http.ResponseWriter, r *http.Request) {
@@ -259,13 +252,13 @@ func (s *Server) deleteApp(w http.ResponseWriter, r *http.Request) {
 	}
 	devices, _ := s.st.DevicesWithApp(r.Context(), a.ID)
 	if err := s.st.DeleteApp(r.Context(), a.UserID, a.ID); err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	for _, d := range devices {
 		s.eng.PushDevice(r.Context(), d)
 	}
-	http.Redirect(w, r, "/apps", http.StatusSeeOther)
+	redirect(w, "/apps")
 }
 
 func (s *Server) moveAppScreen(w http.ResponseWriter, r *http.Request) {
@@ -278,11 +271,11 @@ func (s *Server) moveAppScreen(w http.ResponseWriter, r *http.Request) {
 		delta = -1
 	}
 	if err := s.st.MoveAppScreen(r.Context(), a.ID, r.PathValue("sid"), delta); err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	s.eng.PushApp(r.Context(), a.ID)
-	http.Redirect(w, r, "/apps/"+a.ID, http.StatusSeeOther)
+	redirect(w, "/apps/"+a.ID)
 }
 
 func (s *Server) installApp(w http.ResponseWriter, r *http.Request)   { s.setInstalled(w, r, true) }
@@ -308,11 +301,11 @@ func (s *Server) setInstalled(w http.ResponseWriter, r *http.Request, on bool) {
 		err = s.st.UninstallApp(r.Context(), d.ID, id)
 	}
 	if err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	s.eng.PushDevice(r.Context(), d.ID)
-	http.Redirect(w, r, backTo(r, "/devices/"+d.ID), http.StatusSeeOther)
+	redirect(w, backTo(r, "/devices/"+d.ID))
 }
 
 // backTo is the form's "back" path when it stays on this site, else fallback.

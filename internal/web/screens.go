@@ -16,7 +16,9 @@ type deviceCheck struct {
 	Online  bool
 }
 
-func (s *Server) screenEditPage(w http.ResponseWriter, r *http.Request) {
+// screenEdit is the screen editor's data; with no id, for a new screen
+// (?app= picks its app, ?source= its data source).
+func (s *Server) screenEdit(w http.ResponseWriter, r *http.Request) {
 	u := currentUser(r)
 	sc := &store.Screen{Layout: "big_number"}
 	if id := r.PathValue("id"); id != "" {
@@ -48,10 +50,10 @@ func (s *Server) screenEditPage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	s.renderScreenEdit(w, r, sc, spec, "")
+	s.writeScreenEdit(w, r, sc, spec)
 }
 
-func (s *Server) renderScreenEdit(w http.ResponseWriter, r *http.Request, sc *store.Screen, spec render.Spec, errMsg string) {
+func (s *Server) writeScreenEdit(w http.ResponseWriter, r *http.Request, sc *store.Screen, spec render.Spec) {
 	u := currentUser(r)
 	var app *store.App
 	if sc.AppID != "" {
@@ -76,17 +78,15 @@ func (s *Server) renderScreenEdit(w http.ResponseWriter, r *http.Request, sc *st
 	tmp := *sc
 	b, _ := json.Marshal(spec)
 	tmp.Spec = string(b)
-	s.render(w, r, "screen_edit", map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"Showing":  showing,
 		"App":      app,
 		"Apps":     apps,
 		"Screen":   sc,
 		"Spec":     spec,
 		"Sources":  sources,
-		"Preview":  s.eng.PreviewScreen(r.Context(), &tmp, nil),
+		"Preview":  toWeb(s.eng.PreviewScreen(r.Context(), &tmp, nil)),
 		"Explorer": s.explorerData(src),
-		"Error":    errMsg,
-		"Saved":    r.URL.Query().Get("saved") != "",
 	})
 }
 
@@ -128,7 +128,7 @@ func (s *Server) saveScreen(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		fail(w, http.StatusBadRequest, "bad form")
 		return
 	}
 	layout, spec := specFromForm(r)
@@ -148,20 +148,20 @@ func (s *Server) saveScreen(w http.ResponseWriter, r *http.Request) {
 	}
 	if sc.ID == "" {
 		if err := s.screenApp(r, sc); err != nil {
-			s.renderScreenEdit(w, r, sc, spec, "Could not save: "+err.Error())
+			fail(w, http.StatusBadRequest, "Could not save: "+err.Error())
 			return
 		}
 	}
 	b, _ := json.Marshal(spec)
 	sc.Spec = string(b)
 	if err := s.st.SaveScreen(r.Context(), sc); err != nil {
-		s.renderScreenEdit(w, r, sc, spec, "Could not save: "+err.Error())
+		fail(w, http.StatusBadRequest, "Could not save: "+err.Error())
 		return
 	}
 
 	// Every device with this screen's app installed updates now.
 	s.eng.PushScreens(r.Context(), sc.ID)
-	http.Redirect(w, r, "/screens/"+sc.ID+"?saved=1", http.StatusSeeOther)
+	redirect(w, "/screens/"+sc.ID+"?saved=1")
 }
 
 // screenApp puts a new screen in the app picked on the form. Picking "new"
@@ -187,7 +187,7 @@ func (s *Server) screenApp(r *http.Request, sc *store.Screen) error {
 func (s *Server) previewScreen(w http.ResponseWriter, r *http.Request) {
 	u := currentUser(r)
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		fail(w, http.StatusBadRequest, "bad form")
 		return
 	}
 	layout, spec := specFromForm(r)
@@ -198,7 +198,7 @@ func (s *Server) previewScreen(w http.ResponseWriter, r *http.Request) {
 			sc.SourceID = id
 		}
 	}
-	s.partial(w, "device_screen", map[string]any{"S": s.eng.PreviewScreen(r.Context(), sc, nil), "Big": true})
+	writeJSON(w, http.StatusOK, toWeb(s.eng.PreviewScreen(r.Context(), sc, nil)))
 }
 
 type explorerData struct {
@@ -219,7 +219,7 @@ func (s *Server) explorer(w http.ResponseWriter, r *http.Request) {
 	if id := r.URL.Query().Get("source_id"); id != "" {
 		src, _ = s.st.UserSource(r.Context(), u.ID, id)
 	}
-	s.partial(w, "explorer", s.explorerData(src))
+	writeJSON(w, http.StatusOK, s.explorerData(src))
 }
 
 func (s *Server) deleteScreen(w http.ResponseWriter, r *http.Request) {
@@ -231,11 +231,11 @@ func (s *Server) deleteScreen(w http.ResponseWriter, r *http.Request) {
 	}
 	devices := s.eng.DevicesShowing(r.Context(), id)
 	if err := s.st.DeleteScreen(r.Context(), u.ID, id); err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	for _, d := range devices {
 		s.eng.PushDevice(r.Context(), d)
 	}
-	http.Redirect(w, r, back, http.StatusSeeOther)
+	redirect(w, back)
 }

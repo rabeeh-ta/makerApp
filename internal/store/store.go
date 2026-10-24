@@ -27,7 +27,6 @@ type Store struct {
 // New wraps a database opened and migrated by openDB in db.go.
 func New(db *sql.DB) *Store { return &Store{db: db} }
 
-
 // NewID returns a short random identifier.
 func NewID() string { return RandomToken(8) }
 
@@ -110,7 +109,7 @@ func (s *Store) SetMeta(ctx context.Context, key, value string) error {
 type User struct {
 	ID           string
 	Email        string
-	PasswordHash string
+	PasswordHash string `json:"-"`
 	CreatedAt    int64
 	Username     string // public name for published apps; "" until chosen
 }
@@ -219,8 +218,8 @@ type Device struct {
 	ID         string
 	UserID     string
 	Name       string
-	TokenHash  string
-	PairCode   string
+	TokenHash  string `json:"-"`
+	PairCode   string `json:"-"`
 	FWVersion  string
 	Board      string
 	IP         string
@@ -335,7 +334,7 @@ type Source struct {
 	Kind          string // http | static | push
 	Method        string
 	URL           string
-	Secret        string // encrypted JSON {"auth": "...", "headers": "..."}
+	Secret        string `json:"-"` // encrypted JSON {"auth": "...", "headers": "..."}
 	Body          string
 	IntervalSec   int
 	PushToken     string

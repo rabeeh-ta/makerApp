@@ -6,7 +6,6 @@ import (
 
 	"makerapp/internal/engine"
 	"makerapp/internal/fw"
-	"makerapp/internal/render"
 	"makerapp/internal/store"
 )
 
@@ -20,27 +19,17 @@ func (s *Server) loadDevice(w http.ResponseWriter, r *http.Request) (*store.Devi
 	return d, true
 }
 
-func (s *Server) deviceHead(r *http.Request, d *store.Device, tab string) map[string]any {
-	installed, _ := s.st.DeviceAppIDs(r.Context(), d.ID)
-	return map[string]any{
-		"Device": deviceView{Device: d, Online: s.eng.Online(d.ID), AppCount: len(installed),
-			NeedsUpdate: d.FWVersion != "" && d.FWVersion != fw.Version()},
-		"Tab":       tab,
-		"FWVersion": fw.Version(),
-		"Saved":     r.URL.Query().Get("saved"),
-		"Paired":    r.URL.Query().Get("paired") != "",
-	}
-}
-
 type screenCard struct {
-	S     render.Screen
+	S     *webScreen
 	First bool
 	Last  bool
 }
 
 type installedCard struct {
 	engine.AppView
-	Preview     *render.Screen // first screen, for the thumbnail
+	Catalog     bool       // someone else's app: open it from the public list, not the editor
+	By          string     // its publisher
+	Preview     *webScreen // first screen, for the thumbnail
 	First, Last bool
 	NeedsFW     string // firmware version the board needs before it shows this app
 }
@@ -53,7 +42,8 @@ type appChoice struct {
 	ScreenCount    int
 }
 
-func (s *Server) devicePage(w http.ResponseWriter, r *http.Request) {
+// device is everything the device's Apps and Settings tabs show.
+func (s *Server) device(w http.ResponseWriter, r *http.Request) {
 	d, ok := s.loadDevice(w, r)
 	if !ok {
 		return
@@ -63,9 +53,9 @@ func (s *Server) devicePage(w http.ResponseWriter, r *http.Request) {
 	cards := make([]installedCard, len(installed))
 	for i, a := range installed {
 		have[a.ID] = true
-		cards[i] = installedCard{AppView: a, First: i == 0, Last: i == len(installed)-1}
+		cards[i] = installedCard{AppView: a, Catalog: a.Catalog, By: a.By, First: i == 0, Last: i == len(installed)-1}
 		if len(a.Screens) > 0 {
-			cards[i].Preview = &a.Screens[0]
+			cards[i].Preview = toWeb(a.Screens[0])
 		}
 		if c, ok := engine.CatalogEntry(a.ID); ok && !c.RunsOn(d.FWVersion) {
 			cards[i].NeedsFW = c.NeedsFirmware()
@@ -87,7 +77,11 @@ func (s *Server) devicePage(w http.ResponseWriter, r *http.Request) {
 			choices = append(choices, appChoice{ID: l.ID, Name: l.Name, Desc: l.Desc, By: l.By, Installs: l.Installs})
 		}
 	}
-	data := s.deviceHead(r, d, "apps")
+	data := map[string]any{
+		"Device": deviceView{Device: d, Online: s.eng.Online(d.ID), AppCount: len(installed),
+			NeedsUpdate: d.FWVersion != "" && d.FWVersion != fw.Version()},
+		"FWVersion": fw.Version(),
+	}
 	size := s.eng.StateSize(r.Context(), d.ID)
 	data["DataKB"] = fmt.Sprintf("%.1f", float64(size)/1024)
 	data["DataMaxKB"] = engine.MaxStateBytes / 1024
@@ -101,15 +95,7 @@ func (s *Server) devicePage(w http.ResponseWriter, r *http.Request) {
 	}
 	data["Installed"] = cards
 	data["Choices"] = choices
-	s.render(w, r, "device", data)
-}
-
-func (s *Server) deviceSettingsPage(w http.ResponseWriter, r *http.Request) {
-	d, ok := s.loadDevice(w, r)
-	if !ok {
-		return
-	}
-	s.render(w, r, "device_settings", s.deviceHead(r, d, "settings"))
+	writeJSON(w, http.StatusOK, data)
 }
 
 // moveDeviceApp shifts an installed app one place in the board's drawer.
@@ -123,9 +109,9 @@ func (s *Server) moveDeviceApp(w http.ResponseWriter, r *http.Request) {
 		delta = -1
 	}
 	if err := s.st.MoveDeviceApp(r.Context(), d.ID, r.PathValue("app"), delta); err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	s.eng.PushDevice(r.Context(), d.ID)
-	http.Redirect(w, r, "/devices/"+d.ID, http.StatusSeeOther)
+	redirect(w, "/devices/"+d.ID)
 }

@@ -14,31 +14,21 @@ const (
 	sessionTTL    = 30 * 24 * time.Hour
 )
 
-func (s *Server) home(w http.ResponseWriter, r *http.Request) {
-	if s.userFromCookie(r) != nil {
-		http.Redirect(w, r, "/devices", http.StatusSeeOther)
-		return
+// me tells the website who is signed in, and whether new accounts are open.
+func (s *Server) me(w http.ResponseWriter, r *http.Request) {
+	type user struct{ Email, Username string }
+	var u *user
+	if su := s.userFromCookie(r); su != nil {
+		u = &user{Email: su.Email, Username: su.Username}
 	}
-	s.render(w, r, "landing", map[string]any{"AllowSignup": s.cfg.AllowSignup})
+	writeJSON(w, http.StatusOK, map[string]any{"User": u, "AllowSignup": s.cfg.AllowSignup})
 }
 
 func safeNext(next string) string {
-	if strings.HasPrefix(next, "/") && !strings.HasPrefix(next, "//") {
+	if strings.HasPrefix(next, "/") && !strings.HasPrefix(next, "//") && !strings.HasPrefix(next, "/\\") {
 		return next
 	}
 	return "/devices"
-}
-
-func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, "auth", map[string]any{"Mode": "login", "Next": r.URL.Query().Get("next"), "AllowSignup": s.cfg.AllowSignup})
-}
-
-func (s *Server) signupPage(w http.ResponseWriter, r *http.Request) {
-	if !s.cfg.AllowSignup {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	s.render(w, r, "auth", map[string]any{"Mode": "signup", "Next": r.URL.Query().Get("next"), "AllowSignup": true})
 }
 
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID string) error {
@@ -57,11 +47,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 	password := r.FormValue("password")
 	next := r.FormValue("next")
-	fail := func(msg string) {
-		w.WriteHeader(http.StatusUnauthorized)
-		s.render(w, r, "auth", map[string]any{"Mode": "login", "Error": msg, "Email": email, "Next": next,
-			"AllowSignup": s.cfg.AllowSignup})
-	}
+	fail := func(msg string) { writeJSON(w, http.StatusUnauthorized, map[string]string{"error": msg}) }
 	if !s.allow("login:"+clientIP(r), 10, time.Minute) {
 		fail("Too many attempts. Wait a minute and try again.")
 		return
@@ -75,21 +61,18 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		fail("Could not sign you in. Try again.")
 		return
 	}
-	http.Redirect(w, r, safeNext(next), http.StatusSeeOther)
+	redirect(w, safeNext(next))
 }
 
 func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	if !s.cfg.AllowSignup {
-		http.Error(w, "signups are closed", http.StatusForbidden)
+		fail(w, http.StatusForbidden, "Signups are closed.")
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 	password := r.FormValue("password")
 	next := r.FormValue("next")
-	fail := func(msg string) {
-		w.WriteHeader(http.StatusBadRequest)
-		s.render(w, r, "auth", map[string]any{"Mode": "signup", "Error": msg, "Email": email, "Next": next, "AllowSignup": true})
-	}
+	fail := func(msg string) { writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg}) }
 	if _, err := mail.ParseAddress(email); err != nil {
 		fail("Enter a valid email address.")
 		return
@@ -119,7 +102,7 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	if next == "" {
 		next = "/flash"
 	}
-	http.Redirect(w, r, safeNext(next), http.StatusSeeOther)
+	redirect(w, safeNext(next))
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +110,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 		_ = s.st.DeleteSession(r.Context(), c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1})
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	redirect(w, "/")
 }
 
 // clientIP is the address rate limits count against. Behind Sideyard's proxy

@@ -16,6 +16,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -33,6 +34,9 @@ import (
 	"makerapp/internal/store"
 	"makerapp/internal/web"
 )
+
+//go:embed all:web/dist
+var webDist embed.FS
 
 func main() {
 	level := slog.LevelInfo
@@ -79,14 +83,12 @@ func run(log *slog.Logger) error {
 	go eng.Run(ctx)
 
 	publicURL := os.Getenv("PUBLIC_URL")
-	site, err := web.New(web.Config{
+	site := web.New(web.Config{
 		PublicURL:     publicURL,
 		AllowSignup:   envBool("ALLOW_SIGNUP", true),
 		SecureCookies: strings.HasPrefix(publicURL, "https://"),
+		Frontend:      frontend(webDist),
 	}, st, eng, log)
-	if err != nil {
-		return err
-	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz(db))

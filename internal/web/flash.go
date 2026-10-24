@@ -3,7 +3,6 @@ package web
 import (
 	"bytes"
 	"errors"
-	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -18,30 +17,28 @@ var tokenRe = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
 // ---- browser flashing ----
 
-func (s *Server) flashPage(w http.ResponseWriter, r *http.Request) {
-	u := currentUser(r)
-	board, ok := fw.BoardByID(r.URL.Query().Get("board"))
-	if !ok {
-		// Step 0: pick the board model.
-		s.render(w, r, "flash", map[string]any{"Boards": fw.Boards})
-		return
-	}
-	claim, err := s.st.CreateClaim(r.Context(), u.ID, 24*time.Hour)
-	if err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
-		return
-	}
+// flashInfo is the flash page: the boards it can set up, and where boards
+// installed from it will connect.
+func (s *Server) flashInfo(w http.ResponseWriter, r *http.Request) {
 	base := s.publicBase(r)
-	s.render(w, r, "flash", map[string]any{
-		"Board":        board,
-		"Claim":        claim,
-		"ManifestURL":  "/flash/manifest.json?claim=" + claim,
-		"ServerURL":    wsURL(base),
-		"Insecure":     strings.HasPrefix(base, "http://") && !strings.Contains(r.Host, "localhost") && !strings.HasPrefix(r.Host, "127."),
-		"FWVersion":    fw.Version(),
-		"LocalNetwork": isLocalHost(r.Host),
-		"Available":    fw.Available(),
+	writeJSON(w, http.StatusOK, map[string]any{
+		"Boards":    fw.Boards,
+		"ServerURL": wsURL(base),
+		"Insecure":  strings.HasPrefix(base, "http://") && !strings.Contains(r.Host, "localhost") && !strings.HasPrefix(r.Host, "127."),
+		"FWVersion": fw.Version(),
+		"Available": fw.Available(),
 	})
+}
+
+// newClaim mints the one-time token written into the board being flashed, so
+// it joins this account when it first connects.
+func (s *Server) newClaim(w http.ResponseWriter, r *http.Request) {
+	claim, err := s.st.CreateClaim(r.Context(), currentUser(r).ID, 24*time.Hour)
+	if err != nil {
+		fail(w, http.StatusInternalServerError, "server error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"Claim": claim, "ManifestURL": "/flash/manifest.json?claim=" + claim})
 }
 
 func (s *Server) flashManifest(w http.ResponseWriter, r *http.Request) {
@@ -100,26 +97,13 @@ func (s *Server) serveFirmwareFile(w http.ResponseWriter, r *http.Request, name 
 // flashStatus is polled by the flash page until the new device checks in.
 func (s *Server) flashStatus(w http.ResponseWriter, r *http.Request) {
 	u := currentUser(r)
-	claim := r.URL.Query().Get("claim")
-	deviceID, _ := s.st.ClaimDevice(r.Context(), claim, u.ID)
-	if deviceID == "" {
-		s.partial(w, "flash_waiting", map[string]any{"Claim": claim})
-		return
+	var device any
+	if id, _ := s.st.ClaimDevice(r.Context(), r.URL.Query().Get("claim"), u.ID); id != "" {
+		if d, err := s.st.UserDevice(r.Context(), u.ID, id); err == nil {
+			device = map[string]string{"ID": d.ID, "Name": d.Name}
+		}
 	}
-	d, err := s.st.UserDevice(r.Context(), u.ID, deviceID)
-	if err != nil {
-		s.partial(w, "flash_waiting", map[string]any{"Claim": claim})
-		return
-	}
-	s.partial(w, "flash_done", d)
-}
-
-func isLocalHost(host string) bool {
-	h, _, err := net.SplitHostPort(host)
-	if err != nil {
-		h = host
-	}
-	return h == "localhost" || h == "127.0.0.1" || h == "::1"
+	writeJSON(w, http.StatusOK, map[string]any{"Device": device})
 }
 
 // ---- pairing with the code shown on the device ----
@@ -163,49 +147,25 @@ func (s *Server) claim(r *http.Request, d *store.Device) error {
 	return nil
 }
 
-func (s *Server) pairPage(w http.ResponseWriter, r *http.Request) {
-	id := strings.ToUpper(r.URL.Query().Get("device"))
-	code := r.URL.Query().Get("code")
-	data := map[string]any{"Device": id, "Code": code}
-	if id != "" && code != "" {
-		d, err := s.tryPair(r, id, code)
-		switch {
-		case err == nil:
-			http.Redirect(w, r, "/devices/"+d.ID+"?paired=1", http.StatusSeeOther)
-			return
-		case errors.Is(err, errPairWaiting):
-			data["Waiting"] = true
-		default:
-			data["Error"] = err.Error()
-		}
+// pairTry pairs the device from the link printed on its screen
+// (/pair?device=&code=). The pair page polls it while the device connects.
+func (s *Server) pairTry(w http.ResponseWriter, r *http.Request) {
+	id := strings.ToUpper(r.FormValue("device"))
+	d, err := s.tryPair(r, id, r.FormValue("code"))
+	switch {
+	case err == nil:
+		redirect(w, "/devices/"+d.ID+"?paired=1")
+	case errors.Is(err, errPairWaiting):
+		writeJSON(w, http.StatusOK, map[string]any{"Waiting": true})
+	default:
+		writeJSON(w, http.StatusOK, map[string]any{"Error": err.Error()})
 	}
-	s.render(w, r, "pair", data)
-}
-
-func (s *Server) pairStatus(w http.ResponseWriter, r *http.Request) {
-	id := strings.ToUpper(r.URL.Query().Get("device"))
-	code := r.URL.Query().Get("code")
-	d, err := s.tryPair(r, id, code)
-	if err == nil {
-		w.Header().Set("HX-Redirect", "/devices/"+d.ID+"?paired=1")
-		return
-	}
-	data := map[string]any{"Device": id, "Code": code}
-	if errors.Is(err, errPairWaiting) {
-		data["Waiting"] = true
-	} else {
-		data["Error"] = err.Error()
-	}
-	s.partial(w, "pair_waiting", data)
 }
 
 func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
 	u := currentUser(r)
 	code := strings.ReplaceAll(strings.TrimSpace(r.FormValue("code")), " ", "")
-	fail := func(msg string) {
-		w.WriteHeader(http.StatusBadRequest)
-		s.render(w, r, "pair", map[string]any{"Error": msg, "Code": code})
-	}
+	fail := func(msg string) { writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg}) }
 	if !s.allow("pair:"+u.ID, 10, time.Minute) {
 		fail("Too many attempts. Wait a minute.")
 		return
@@ -223,5 +183,5 @@ func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
 		fail("Could not pair the device. Try again.")
 		return
 	}
-	http.Redirect(w, r, "/devices/"+d.ID+"?paired=1", http.StatusSeeOther)
+	redirect(w, "/devices/"+d.ID+"?paired=1")
 }

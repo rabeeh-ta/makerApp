@@ -15,7 +15,7 @@ type deviceView struct {
 	Online      bool
 	AppCount    int
 	NeedsUpdate bool
-	Preview     *render.Screen // first installed app's first screen, for the card thumbnail
+	Preview     *webScreen // first installed app's first screen, for the card thumbnail
 }
 
 func (s *Server) deviceViews(r *http.Request) ([]deviceView, error) {
@@ -30,14 +30,14 @@ func (s *Server) deviceViews(r *http.Request) ([]deviceView, error) {
 		v := deviceView{Device: d, Online: s.eng.Online(d.ID), AppCount: len(apps),
 			NeedsUpdate: d.FWVersion != "" && d.FWVersion != fw.Version()}
 		if len(apps) > 0 && len(apps[0].Screens) > 0 {
-			v.Preview = &apps[0].Screens[0]
+			v.Preview = toWeb(apps[0].Screens[0])
 		}
 		out = append(out, v)
 	}
 	return out, nil
 }
 
-func (s *Server) devicesPage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) devices(w http.ResponseWriter, r *http.Request) {
 	views, err := s.deviceViews(r)
 	if notFound(w, err) {
 		return
@@ -51,7 +51,7 @@ func (s *Server) devicesPage(w http.ResponseWriter, r *http.Request) {
 			installed = true
 		}
 	}
-	s.render(w, r, "devices", map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"Devices": views,
 		// Getting-started checklist, hidden once everything is done.
 		"HasDevice": len(views) > 0, "HasSource": len(sources) > 0, "HasScreen": len(screens) > 0,
@@ -65,21 +65,13 @@ func (s *Server) devicesPage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) devicesList(w http.ResponseWriter, r *http.Request) {
-	views, err := s.deviceViews(r)
-	if notFound(w, err) {
-		return
-	}
-	s.partial(w, "device_cards", views)
-}
-
 func (s *Server) deviceStatus(w http.ResponseWriter, r *http.Request) {
 	u := currentUser(r)
 	d, err := s.st.UserDevice(r.Context(), u.ID, r.PathValue("id"))
 	if notFound(w, err) {
 		return
 	}
-	s.partial(w, "device_badge", deviceView{Device: d, Online: s.eng.Online(d.ID)})
+	writeJSON(w, http.StatusOK, map[string]any{"Online": s.eng.Online(d.ID), "LastSeen": d.LastSeen})
 }
 
 func (s *Server) saveDevice(w http.ResponseWriter, r *http.Request) {
@@ -100,11 +92,11 @@ func (s *Server) saveDevice(w http.ResponseWriter, r *http.Request) {
 		OffsetY:    clamp(atoi(r.FormValue("offset_y"), 0), -20, 20),
 	}
 	if err := s.st.UpdateDeviceSettings(r.Context(), u.ID, d.ID, settings); err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	s.eng.PushDevice(r.Context(), d.ID)
-	http.Redirect(w, r, "/devices/"+d.ID+"/settings?saved=1", http.StatusSeeOther)
+	redirect(w, "/devices/"+d.ID+"/settings?saved=1")
 }
 
 func (s *Server) deviceAction(w http.ResponseWriter, r *http.Request) {
@@ -137,20 +129,20 @@ func (s *Server) deviceAction(w http.ResponseWriter, r *http.Request) {
 		msg = "Restarting."
 	case "forget":
 		if err := s.st.ForgetDevice(r.Context(), u.ID, d.ID); err != nil {
-			http.Error(w, "server error", http.StatusInternalServerError)
+			fail(w, http.StatusInternalServerError, "server error")
 			return
 		}
 		s.eng.Send(d.ID, map[string]any{"type": "unpaired"})
-		w.Header().Set("HX-Redirect", "/devices")
+		redirect(w, "/devices")
 		return
 	default:
-		http.NotFound(w, r)
+		fail(w, http.StatusNotFound, "no such action")
 		return
 	}
 	if !online {
 		msg = "The device is offline."
 	}
-	s.partial(w, "action_msg", map[string]any{"Msg": msg, "Error": !online})
+	writeJSON(w, http.StatusOK, map[string]any{"Msg": msg, "Error": !online})
 }
 
 func atoi(s string, def int) int {

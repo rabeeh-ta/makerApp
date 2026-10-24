@@ -65,7 +65,7 @@ type sourceView struct {
 	ScreenCount int
 }
 
-func (s *Server) sourcesPage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) sources(w http.ResponseWriter, r *http.Request) {
 	u := currentUser(r)
 	list, err := s.st.UserSources(r.Context(), u.ID)
 	if notFound(w, err) {
@@ -76,10 +76,11 @@ func (s *Server) sourcesPage(w http.ResponseWriter, r *http.Request) {
 		ids, _ := s.st.ScreenIDsForSource(r.Context(), x.ID)
 		views = append(views, sourceView{Source: x, ScreenCount: len(ids)})
 	}
-	s.render(w, r, "sources", map[string]any{"Sources": views})
+	writeJSON(w, http.StatusOK, map[string]any{"Sources": views})
 }
 
-func (s *Server) sourceEditPage(w http.ResponseWriter, r *http.Request) {
+// sourceEdit is the source editor's data; with no id, for a new source.
+func (s *Server) sourceEdit(w http.ResponseWriter, r *http.Request) {
 	u := currentUser(r)
 	src := &store.Source{Kind: "http", Method: "GET", IntervalSec: 300}
 	if id := r.PathValue("id"); id != "" {
@@ -89,12 +90,12 @@ func (s *Server) sourceEditPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	s.renderSourceEdit(w, r, src, "")
+	s.writeSourceEdit(w, r, src)
 }
 
 type kv struct{ K, V string }
 
-func (s *Server) renderSourceEdit(w http.ResponseWriter, r *http.Request, src *store.Source, errMsg string) {
+func (s *Server) writeSourceEdit(w http.ResponseWriter, r *http.Request, src *store.Source) {
 	sec := s.eng.OpenSecret(src)
 	var headers []kv
 	for _, line := range strings.Split(sec.Headers, "\n") {
@@ -110,14 +111,13 @@ func (s *Server) renderSourceEdit(w http.ResponseWriter, r *http.Request, src *s
 	if src.Kind == "static" {
 		staticData = src.LastData
 	}
-	s.render(w, r, "source_edit", map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"Source":     src,
 		"HasAuth":    sec.Auth != "",
 		"HeaderRows": headers,
 		"SecretKeys": secretKeys,
 		"StaticData": staticData,
 		"Presets":    presets,
-		"Error":      errMsg,
 		"PushURL":    s.publicBase(r) + "/push/" + src.PushToken,
 		"Data":       s.sourceData(src),
 		"Intervals": []struct {
@@ -170,7 +170,7 @@ func (s *Server) saveSource(w http.ResponseWriter, r *http.Request) {
 	src.Body = strings.TrimSpace(r.FormValue("body"))
 	src.IntervalSec = clamp(atoi(r.FormValue("interval_sec"), 300), 15, 86400)
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		fail(w, http.StatusBadRequest, "bad form")
 		return
 	}
 	// Header rows -> "Name: value" lines (stored encrypted).
@@ -215,20 +215,20 @@ func (s *Server) saveSource(w http.ResponseWriter, r *http.Request) {
 	src.Secret = s.eng.SealSecret(sec)
 
 	if src.Name == "" {
-		s.renderSourceEdit(w, r, src, "Give the source a name.")
+		fail(w, http.StatusBadRequest, "Give the source a name.")
 		return
 	}
 	switch src.Kind {
 	case "http":
 		if !strings.HasPrefix(src.URL, "http://") && !strings.HasPrefix(src.URL, "https://") {
-			s.renderSourceEdit(w, r, src, "The URL must start with https:// (or http://).")
+			fail(w, http.StatusBadRequest, "The URL must start with https:// (or http://).")
 			return
 		}
 		if src.Method != "GET" && src.Method != "POST" && src.Method != "PUT" && src.Method != "PATCH" {
 			src.Method = "GET"
 		}
 		if src.Body != "" && src.Method != "GET" && !json.Valid([]byte(src.Body)) {
-			s.renderSourceEdit(w, r, src, "The request body isn't valid JSON.")
+			fail(w, http.StatusBadRequest, "The request body isn't valid JSON.")
 			return
 		}
 	case "static":
@@ -240,11 +240,11 @@ func (s *Server) saveSource(w http.ResponseWriter, r *http.Request) {
 			src.PushToken = store.RandomToken(16)
 		}
 	default:
-		s.renderSourceEdit(w, r, src, "Pick a source type.")
+		fail(w, http.StatusBadRequest, "Pick a source type.")
 		return
 	}
 	if err := s.st.SaveSource(r.Context(), src); err != nil {
-		s.renderSourceEdit(w, r, src, "Could not save: "+err.Error())
+		fail(w, http.StatusBadRequest, "Could not save: "+err.Error())
 		return
 	}
 	if src.Kind == "http" {
@@ -255,7 +255,7 @@ func (s *Server) saveSource(w http.ResponseWriter, r *http.Request) {
 	} else {
 		s.eng.PushSource(r.Context(), src.ID)
 	}
-	http.Redirect(w, r, "/sources/"+src.ID, http.StatusSeeOther)
+	redirect(w, "/sources/"+src.ID)
 }
 
 // stripParams removes secret keys from a URL in case they were also typed there.
@@ -293,7 +293,7 @@ func (s *Server) fetchSource(w http.ResponseWriter, r *http.Request) {
 	_ = s.eng.Refresh(ctx, src)
 	cancel()
 	src, _ = s.st.UserSource(r.Context(), u.ID, src.ID)
-	s.partial(w, "source_data", s.sourceData(src))
+	writeJSON(w, http.StatusOK, s.sourceData(src))
 }
 
 func (s *Server) deleteSource(w http.ResponseWriter, r *http.Request) {
@@ -301,11 +301,11 @@ func (s *Server) deleteSource(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	screens, _ := s.st.ScreenIDsForSource(r.Context(), id)
 	if err := s.st.DeleteSource(r.Context(), u.ID, id); err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	s.eng.PushScreens(r.Context(), screens...)
-	http.Redirect(w, r, "/sources", http.StatusSeeOther)
+	redirect(w, "/sources")
 }
 
 // pushData lets anything POST JSON into a "push" source: curl, Zapier, a cron job.
