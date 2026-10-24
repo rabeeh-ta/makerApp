@@ -1,0 +1,29 @@
+{{define "title"}}Your desk display, your data{{end}}
+{{define "content"}}
+<section class="hero">
+  <div>
+    <p class="eyebrow">makerApp</p>
+    <h1>Put any API on the little screen on your desk.</h1>
+    <p class="lead">Flash your ESP32-S3 board from the browser, connect it to WiFi, then point it at any API. Choose the fields to show, decide what the three buttons do, and press save. The device updates within seconds.</p>
+    <p class="row">
+      {{if .AllowSignup}}<a class="btn" href="/signup">Create an account</a>{{end}}
+      <a class="btn ghost" href="/login">Log in</a>
+    </p>
+  </div>
+  <div class="hero-device">
+    <div class="board">
+      <div class="lcd lcd-big" style="--accent:#F54E00">
+        <div class="lcd-title">Signups today</div>
+        <div class="lcd-value">1,284</div>
+        <div class="lcd-sub" style="color:#2BB673">+12% vs yesterday</div>
+      </div>
+      <div class="board-buttons"><i></i><i></i><i></i></div>
+    </div>
+  </div>
+</section>
+<section class="grid three steps">
+  <div class="card"><span class="step">1</span><h3>Flash in the browser</h3><p class="muted">Plug in over USB, click Install, enter WiFi.</p></div>
+  <div class="card"><span class="step">2</span><h3>Connect any data</h3><p class="muted">Any API, a webhook, or fixed data.</p></div>
+  <div class="card"><span class="step">3</span><h3>Build apps</h3><p class="muted">Group screens into apps and install them. The board lists them in its Apps drawer.</p></div>
+</section>
+{{end}}

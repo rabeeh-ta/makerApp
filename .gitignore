@@ -1,6 +1,10 @@
-/bin/
 /data/
+/app
+/bin/
 /backup/
+.env.deploy
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
 firmware/.pio/
 .DS_Store
-.env.deploy

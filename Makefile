@@ -1,22 +1,39 @@
-# espHog: one Go binary with the website, device API and firmware baked in.
+# makerApp: one Go binary with the website, the device API and the makerDevice
+# firmware baked in. It deploys to Sideyard; AGENTS.md has the contract.
 #
-#   make            build firmware + server for this machine -> bin/esphog
-#   make run        build and run locally on :8080
-#   make linux      cross-compile for a Linux server (amd64 + arm64)
-#   make test       run the game check and Go tests
-#   make games-check run every downloadable game on this computer (bin/gamecheck)
-#   make deploy     build for Linux and upload to Sideyard (settings in .env.deploy)
+# Local development:   make api   (Go on :3000)   and   make web-dev   (Vite on :5173)
+# Deploy from laptop:  put SIDEYARD_URL/PROJECT/TOKEN in .env.deploy, then make deploy
+#
+#   make firmware     build the firmware (PlatformIO) into internal/fw/bin; commit the result
+#   make test         run the game check and the Go tests
+#   make games-check  run every downloadable game on this computer (bin/gamecheck)
+
+GOARCH ?= amd64
 
 FW_DIR   := firmware
-SRV_DIR  := server
 FW_OUT   := $(FW_DIR)/.pio/build/feather_s3_rtft
-EMBED    := $(SRV_DIR)/internal/fw/bin
+EMBED    := internal/fw/bin
 BOOT_APP := $(HOME)/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin
 PIO      ?= pio
+LUA_DIR  := $(FW_DIR)/lib/lua/src
 
-.PHONY: all firmware server run linux deploy test games-check clean
+.PHONY: api web-dev web build deploy firmware test games-check clean
 
-all: firmware server
+api:
+	go run .
+
+web-dev:
+	cd web && npm run dev
+
+web:
+	cd web && npm ci && npm run build
+
+# A Linux binary for the server, with the frontend and firmware embedded.
+build: web
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) go build -trimpath -ldflags="-s -w" -o app .
+
+deploy: build
+	@set -a; [ -f .env.deploy ] && . ./.env.deploy; set +a; ./scripts/deploy.sh app
 
 firmware:
 	cd $(FW_DIR) && $(PIO) run
@@ -25,41 +42,15 @@ firmware:
 	cp $(BOOT_APP) $(EMBED)/
 	cp $(FW_DIR)/version.txt $(EMBED)/
 
-server:
-	mkdir -p bin
-	cd $(SRV_DIR) && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o ../bin/esphog .
-
-run: all
-	./bin/esphog
-
-linux: firmware
-	mkdir -p bin
-	cd $(SRV_DIR) && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o ../bin/esphog-linux-amd64 .
-	cd $(SRV_DIR) && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o ../bin/esphog-linux-arm64 .
-
-# Sideyard: .env.deploy holds SIDEYARD_URL, SIDEYARD_PROJECT and SIDEYARD_TOKEN.
-# Sideyard health-checks the new release and keeps the old one serving if it fails.
-SIDEYARD_ARCH ?= amd64
-
-deploy: firmware
-	mkdir -p bin
-	cd $(SRV_DIR) && CGO_ENABLED=0 GOOS=linux GOARCH=$(SIDEYARD_ARCH) go build -trimpath -ldflags "-s -w" -o ../bin/esphog-sideyard .
-	@set -a; . ./.env.deploy; set +a; \
-	curl --fail-with-body -sS -H "Authorization: Bearer $$SIDEYARD_TOKEN" \
-		-F binary=@bin/esphog-sideyard --form-string "message=firmware $$(cat $(FW_DIR)/version.txt)" \
-		"$$SIDEYARD_URL/api/projects/$$SIDEYARD_PROJECT/deploys"; echo
-
 test: games-check
-	cd $(SRV_DIR) && go test ./...
-
-LUA_DIR := $(FW_DIR)/lib/lua/src
+	go test ./...
 
 games-check:
 	mkdir -p bin/gamecheck-obj
 	cd bin/gamecheck-obj && cc -O2 -w -c $(addprefix ../../,$(wildcard $(LUA_DIR)/*.c))
 	c++ -O2 -std=c++17 -I$(LUA_DIR) -I$(FW_DIR)/src -o bin/gamecheck \
 		$(FW_DIR)/tools/gamecheck.cpp $(FW_DIR)/src/lua_api.cpp $(FW_DIR)/src/game_vm.cpp bin/gamecheck-obj/*.o
-	./bin/gamecheck $(SRV_DIR)/internal/games/*.lua
+	./bin/gamecheck internal/games/*.lua
 
 clean:
-	rm -rf bin $(FW_DIR)/.pio/build
+	rm -rf bin app $(FW_DIR)/.pio/build
