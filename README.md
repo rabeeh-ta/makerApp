@@ -52,7 +52,7 @@ sources, explores APIs, creates sources, apps and screens, and installs your app
 boards. Each screen it makes comes back with checks (text that won't fit the board's
 font, paths that aren't in the data), so it fixes them before you see them. It can't see
 or add API keys (it gives you the source's link to add one), delete anything, publish, or
-install apps other people published. **Apps → Build with AI** has the steps and the
+install apps other people published. **Data → AI connector** has the steps and the
 connected apps, with **Disconnect**.
 
 Under the hood: OAuth 2.1 with PKCE (client ID metadata documents or dynamic

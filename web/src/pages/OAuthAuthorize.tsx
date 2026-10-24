@@ -48,7 +48,7 @@ export function OAuthAuthorize() {
         <li>Install apps other people published</li>
       </ul>
       <p className="muted small">
-        Afterwards you go back to <span className="mono">{data.RedirectHost}</span>. You can disconnect it any time under Apps → Build with AI.
+        Afterwards you go back to <span className="mono">{data.RedirectHost}</span>. You can disconnect it any time under Data → AI connector.
       </p>
       <div className="row consent-actions">
         <button type="button" className="btn ghost" disabled={busy} onClick={() => decide('deny')}>

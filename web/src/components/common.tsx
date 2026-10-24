@@ -54,6 +54,21 @@ function DeviceBadge({ device }: { device: DeviceView }) {
   return <span className={st.Online ? 'badge ok' : 'badge off'}>{st.Online ? 'Online' : `Offline · seen ${ago(st.LastSeen)}`}</span>
 }
 
+// DataTabs switch between the Data section's pages: data sources and the AI
+// connector (MCP).
+export function DataTabs({ tab }: { tab: 'sources' | 'ai' }) {
+  return (
+    <nav className="tabs-nav">
+      <Link to="/sources" className={tab === 'sources' ? 'on' : undefined}>
+        Sources
+      </Link>
+      <Link to="/connect" className={tab === 'ai' ? 'on' : undefined}>
+        AI connector
+      </Link>
+    </nav>
+  )
+}
+
 // DeviceHead is the title and tabs of a device's pages.
 export function DeviceHead({ device, tab, paired }: { device: DeviceView; tab: 'apps' | 'settings'; paired?: boolean }) {
   return (

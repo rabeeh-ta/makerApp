@@ -22,7 +22,7 @@ export function Layout({ me, path, onSignOut, children }: { me: Me; path: string
               <nav>
                 <Link to="/devices" className={on('/devices', '/flash')}>Devices</Link>
                 <Link to="/apps" className={on('/apps', '/screens')}>Apps</Link>
-                <Link to="/sources" className={on('/sources')}>Data</Link>
+                <Link to="/sources" className={on('/sources', '/connect')}>Data</Link>
               </nav>
               <div className="who">
                 <span className="avatar" title={me.User.Email}>{me.User.Email.slice(0, 1)}</span>
