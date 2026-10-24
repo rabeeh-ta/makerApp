@@ -48,7 +48,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	next := r.FormValue("next")
 	fail := func(msg string) { writeJSON(w, http.StatusUnauthorized, map[string]string{"error": msg}) }
-	if !s.allow("login:"+clientIP(r), 10, time.Minute) {
+	if !s.lim.Allow("login:"+clientIP(r), 10, time.Minute) {
 		fail("Too many attempts. Wait a minute and try again.")
 		return
 	}
@@ -81,7 +81,7 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 		fail("Use at least 8 characters for the password.")
 		return
 	}
-	if !s.allow("signup:"+clientIP(r), 5, time.Hour) {
+	if !s.lim.Allow("signup:"+clientIP(r), 5, time.Hour) {
 		fail("Too many sign-ups from this network. Try again later.")
 		return
 	}

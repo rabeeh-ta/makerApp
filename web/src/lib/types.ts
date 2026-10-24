@@ -64,6 +64,7 @@ export type App = {
   CreatedAt: number
   Description: string
   PublishedAt: number
+  MadeBy: string // the AI app that made it, "" if made here
 }
 
 export type StoredScreen = {

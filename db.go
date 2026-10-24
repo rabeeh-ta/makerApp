@@ -125,6 +125,45 @@ var migrations = []string{
 	)`,
 	// Holds the generated SECRET_KEY when running locally without one.
 	`CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+
+	// The AI client that made an app over MCP ("Claude"); "" when made on the website.
+	`ALTER TABLE apps ADD COLUMN made_by TEXT NOT NULL DEFAULT ''`,
+	// MCP sign-in (OAuth 2.1). A client is an AI app: registered dynamically
+	// (random ID) or identified by its metadata document's URL.
+	`CREATE TABLE oauth_clients (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		redirect_uris TEXT NOT NULL,            -- JSON array
+		created_at TEXT NOT NULL,
+		fetched_at TEXT                         -- metadata documents: when the cached copy was fetched
+	)`,
+	// A grant is one user's permission for one client; disconnecting deletes it,
+	// and its codes and tokens with it.
+	`CREATE TABLE oauth_grants (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		client_id TEXT NOT NULL,
+		client_name TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		last_used_at TEXT,
+		UNIQUE (user_id, client_id)
+	)`,
+	`CREATE TABLE oauth_codes (
+		code_hash TEXT PRIMARY KEY,
+		grant_id TEXT NOT NULL REFERENCES oauth_grants(id) ON DELETE CASCADE,
+		redirect_uri TEXT NOT NULL,
+		challenge TEXT NOT NULL,                -- PKCE S256
+		resource TEXT NOT NULL,
+		expires_at TEXT NOT NULL
+	)`,
+	`CREATE TABLE oauth_tokens (
+		token_hash TEXT PRIMARY KEY,
+		grant_id TEXT NOT NULL REFERENCES oauth_grants(id) ON DELETE CASCADE,
+		kind TEXT NOT NULL CHECK (kind IN ('access', 'refresh')),
+		expires_at TEXT NOT NULL,
+		used_at TEXT                            -- refresh tokens: when exchanged; a second use revokes the grant
+	)`,
+	`CREATE INDEX idx_oauth_tokens_grant ON oauth_tokens(grant_id)`,
 }
 
 func migrate(db *sql.DB) error {

@@ -8,11 +8,13 @@ import type { Me } from './lib/types'
 import { AppPage } from './pages/App'
 import { Apps } from './pages/Apps'
 import { Auth } from './pages/Auth'
+import { Connect } from './pages/Connect'
 import { Device } from './pages/Device'
 import { DeviceSettings } from './pages/DeviceSettings'
 import { Devices } from './pages/Devices'
 import { Flash } from './pages/Flash'
 import { Landing } from './pages/Landing'
+import { OAuthAuthorize } from './pages/OAuthAuthorize'
 import { Pair } from './pages/Pair'
 import { ScreenEdit } from './pages/ScreenEdit'
 import { SourceEdit } from './pages/SourceEdit'
@@ -33,6 +35,8 @@ const routes: Route[] = [
   { re: /^\/apps$/, page: (_, me) => <Apps me={me} /> },
   { re: /^\/apps\/([^/]+)$/, page: ([id]) => <AppPage id={id} /> },
   { re: /^\/screens\/([^/]+)$/, page: ([id]) => <ScreenEdit key={id} id={id === 'new' ? '' : id} /> },
+  { re: /^\/connect$/, page: () => <Connect /> },
+  { re: /^\/oauth\/authorize$/, page: () => <OAuthAuthorize /> },
 ]
 
 export function App() {

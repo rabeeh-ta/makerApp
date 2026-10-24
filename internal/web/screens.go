@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"makerapp/internal/library"
 	"makerapp/internal/render"
 	"makerapp/internal/store"
 )
@@ -120,87 +121,31 @@ func specFromForm(r *http.Request) (string, render.Spec) {
 }
 
 func (s *Server) saveScreen(w http.ResponseWriter, r *http.Request) {
-	u := currentUser(r)
-	sc := &store.Screen{UserID: u.ID}
-	if id := r.PathValue("id"); id != "" {
-		var err error
-		sc, err = s.st.UserScreen(r.Context(), u.ID, id)
-		if notFound(w, err) {
-			return
-		}
-	}
 	if err := r.ParseForm(); err != nil {
 		fail(w, http.StatusBadRequest, "bad form")
 		return
 	}
 	layout, spec := specFromForm(r)
-	sc.Layout = layout
-	sc.Name = strings.TrimSpace(r.FormValue("name"))
-	sc.SourceID = r.FormValue("source_id")
-	if sc.SourceID != "" {
-		if _, err := s.st.UserSource(r.Context(), u.ID, sc.SourceID); err != nil {
-			sc.SourceID = ""
-		}
-	}
-	if sc.Name == "" {
-		sc.Name = spec.Title
-	}
-	if sc.Name == "" {
-		sc.Name = "Untitled screen"
-	}
-	if sc.ID == "" {
-		if err := s.screenApp(r, sc); err != nil {
-			fail(w, http.StatusBadRequest, "Could not save: "+err.Error())
-			return
-		}
-	}
-	b, _ := json.Marshal(spec)
-	sc.Spec = string(b)
-	if err := s.st.SaveScreen(r.Context(), sc); err != nil {
-		fail(w, http.StatusBadRequest, "Could not save: "+err.Error())
+	sc, err := s.lib.SaveScreen(r.Context(), currentUser(r).ID, r.PathValue("id"), library.ScreenInput{
+		App: r.FormValue("app"), Name: r.FormValue("name"), Layout: layout, Spec: spec, SourceID: r.FormValue("source_id"),
+	})
+	if failed(w, err) {
 		return
 	}
-
-	// Every device with this screen's app installed updates now.
-	s.eng.PushScreens(r.Context(), sc.ID)
 	redirect(w, "/screens/"+sc.ID+"?saved=1")
 }
 
-// screenApp puts a new screen in the app picked on the form. Picking "new"
-// makes an app named after the screen, installed on the user's board when
-// they have exactly one.
-func (s *Server) screenApp(r *http.Request, sc *store.Screen) error {
-	u := currentUser(r)
-	if a, err := s.st.UserApp(r.Context(), u.ID, r.FormValue("app")); err == nil {
-		sc.AppID = a.ID
-		return nil
-	}
-	a := &store.App{UserID: u.ID, Name: sc.Name}
-	if err := s.st.SaveApp(r.Context(), a); err != nil {
-		return err
-	}
-	sc.AppID = a.ID
-	if devices, _ := s.st.UserDevices(r.Context(), u.ID); len(devices) == 1 {
-		return s.st.InstallApp(r.Context(), devices[0].ID, a.ID)
-	}
-	return nil
-}
-
 func (s *Server) previewScreen(w http.ResponseWriter, r *http.Request) {
-	u := currentUser(r)
 	if err := r.ParseForm(); err != nil {
 		fail(w, http.StatusBadRequest, "bad form")
 		return
 	}
 	layout, spec := specFromForm(r)
-	b, _ := json.Marshal(spec)
-	sc := &store.Screen{ID: "preview", Layout: layout, Spec: string(b)}
-	if id := r.FormValue("source_id"); id != "" {
-		if _, err := s.st.UserSource(r.Context(), u.ID, id); err == nil {
-			sc.SourceID = id
-		}
+	sc, err := s.lib.Preview(r.Context(), currentUser(r).ID, library.ScreenInput{Layout: layout, Spec: spec, SourceID: r.FormValue("source_id")})
+	if failed(w, err) {
+		return
 	}
-	writeJSON(w, http.StatusOK, toWeb(s.eng.PreviewScreen(r.Context(), sc, nil)))
+	writeJSON(w, http.StatusOK, toWeb(sc))
 }
 
 type explorerData struct {

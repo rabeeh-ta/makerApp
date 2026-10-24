@@ -2,63 +2,16 @@ package web
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
-	"time"
 
 	"makerapp/internal/fetch"
+	"makerapp/internal/library"
 	"makerapp/internal/render"
 	"makerapp/internal/store"
 )
-
-// Preset prefills the request form. Presets are only shortcuts; every source is
-// just a request (with an optional token) whose JSON you map onto screens.
-type PresetParam struct {
-	K      string `json:"k"`
-	V      string `json:"v"`
-	Secret bool   `json:"secret,omitempty"`
-}
-
-type Preset struct {
-	Name     string        `json:"name"`
-	Desc     string        `json:"desc"`
-	Badge    string        `json:"badge"` // 2-letter mark on the template card
-	Method   string        `json:"method"`
-	URL      string        `json:"url"`
-	Params   []PresetParam `json:"params,omitempty"`
-	Body     string        `json:"body,omitempty"`
-	Headers  []PresetParam `json:"headers,omitempty"`
-	AuthHint string        `json:"auth_hint,omitempty"`
-	Interval int           `json:"interval,omitempty"`
-}
-
-var presets = []Preset{
-	{Name: "Blank request", Desc: "Any URL that returns JSON", Badge: "{}", Method: "GET"},
-	{Name: "Meteosource weather", Desc: "Current weather; free key from meteosource.com", Badge: "MS", Method: "GET",
-		URL:    "https://www.meteosource.com/api/v1/free/point?lat=11.2588&lon=75.7804&sections=current&timezone=auto&language=en&units=metric",
-		Params: []PresetParam{{K: "key", Secret: true}}, Interval: 900},
-	{Name: "Open-Meteo weather", Desc: "Temperature + hourly forecast, no key", Badge: "OM", Method: "GET",
-		URL: "https://api.open-meteo.com/v1/forecast?latitude=12.97&longitude=77.59&current=temperature_2m,wind_speed_10m&hourly=temperature_2m&forecast_days=1", Interval: 900},
-	{Name: "PostHog SQL", Desc: "Run a HogQL query on your project", Badge: "PH", Method: "POST",
-		URL:      "https://us.posthog.com/api/projects/PROJECT_ID/query/",
-		Body:     `{"query": {"kind": "HogQLQuery", "query": "SELECT count() FROM events WHERE timestamp > now() - INTERVAL 1 DAY"}}`,
-		AuthHint: "Personal API key (phx_...)", Interval: 300},
-	{Name: "PostHog insight", Desc: "Results of a saved insight", Badge: "PH", Method: "GET",
-		URL: "https://us.posthog.com/api/projects/PROJECT_ID/insights/INSIGHT_ID/?refresh=blocking", AuthHint: "Personal API key (phx_...)", Interval: 300},
-	{Name: "HubSpot top deals", Desc: "Biggest deals by amount", Badge: "HS", Method: "POST",
-		URL:      "https://api.hubapi.com/crm/v3/objects/deals/search",
-		Body:     `{"limit": 10, "properties": ["dealname", "amount", "dealstage"], "sorts": [{"propertyName": "amount", "direction": "DESCENDING"}]}`,
-		AuthHint: "Private app token (pat-...)", Interval: 300},
-	{Name: "HubSpot contact count", Desc: "Total contacts in your CRM", Badge: "HS", Method: "POST",
-		URL: "https://api.hubapi.com/crm/v3/objects/contacts/search", Body: `{"limit": 1}`, AuthHint: "Private app token (pat-...)", Interval: 900},
-	{Name: "Crypto prices", Desc: "CoinGecko prices + 24h change, no key", Badge: "CG", Method: "GET",
-		URL: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true", Interval: 300},
-	{Name: "GitHub repo", Desc: "Stars, forks, open issues", Badge: "GH", Method: "GET", URL: "https://api.github.com/repos/PostHog/posthog", Interval: 1800},
-}
 
 type sourceView struct {
 	*store.Source
@@ -117,7 +70,7 @@ func (s *Server) writeSourceEdit(w http.ResponseWriter, r *http.Request, src *st
 		"HeaderRows": headers,
 		"SecretKeys": secretKeys,
 		"StaticData": staticData,
-		"Presets":    presets,
+		"Presets":    library.Presets,
 		"PushURL":    s.publicBase(r) + "/push/" + src.PushToken,
 		"Data":       s.sourceData(src),
 		"Intervals": []struct {
@@ -153,146 +106,46 @@ func (s *Server) sourceData(src *store.Source) sourceData {
 }
 
 func (s *Server) saveSource(w http.ResponseWriter, r *http.Request) {
-	u := currentUser(r)
-	src := &store.Source{UserID: u.ID}
-	if id := r.PathValue("id"); id != "" {
-		var err error
-		src, err = s.st.UserSource(r.Context(), u.ID, id)
-		if notFound(w, err) {
-			return
-		}
-	}
-	sec := s.eng.OpenSecret(src)
-	src.Name = strings.TrimSpace(r.FormValue("name"))
-	src.Kind = r.FormValue("kind")
-	src.Method = strings.ToUpper(r.FormValue("method"))
-	src.URL = strings.TrimSpace(r.FormValue("url"))
-	src.Body = strings.TrimSpace(r.FormValue("body"))
-	src.IntervalSec = clamp(atoi(r.FormValue("interval_sec"), 300), 15, 86400)
 	if err := r.ParseForm(); err != nil {
 		fail(w, http.StatusBadRequest, "bad form")
 		return
 	}
-	// Header rows -> "Name: value" lines (stored encrypted).
-	var lines []string
+	in := library.SourceInput{
+		Name:        r.FormValue("name"),
+		Kind:        r.FormValue("kind"),
+		Method:      r.FormValue("method"),
+		URL:         r.FormValue("url"),
+		Body:        r.FormValue("body"),
+		IntervalSec: atoi(r.FormValue("interval_sec"), 300),
+		StaticData:  r.FormValue("static_data"),
+	}
+	sec := &library.SourceSecrets{Auth: r.FormValue("auth"), ClearAuth: r.FormValue("clear_auth") == "1"}
 	hk, hv := r.Form["hk"], r.Form["hv"]
 	for i := range hk {
-		if k := strings.TrimSpace(hk[i]); k != "" && i < len(hv) {
-			lines = append(lines, k+": "+strings.TrimSpace(hv[i]))
+		if i < len(hv) {
+			sec.Headers = append(sec.Headers, fetch.Param{K: hk[i], V: hv[i]})
 		}
 	}
-	sec.Headers = strings.Join(lines, "\n")
-	// Secret query params: kept out of the URL, added when fetching.
-	old := map[string]string{}
-	for _, p := range sec.Params {
-		old[p.K] = p.V
-	}
-	sec.Params = nil
 	sk, sv := r.Form["sk"], r.Form["sv"]
 	for i := range sk {
-		k := strings.TrimSpace(sk[i])
-		if k == "" {
-			continue
-		}
 		v := ""
 		if i < len(sv) {
-			v = strings.TrimSpace(sv[i])
+			v = sv[i]
 		}
-		if v == "" {
-			v = old[k] // blank means "keep the saved value"
-		}
-		if v != "" {
-			sec.Params = append(sec.Params, fetch.Param{K: k, V: v})
-		}
+		sec.Params = append(sec.Params, fetch.Param{K: sk[i], V: v})
 	}
-	src.URL = stripParams(src.URL, sec.Params)
-	if a := strings.TrimSpace(r.FormValue("auth")); a != "" {
-		sec.Auth = a
-	}
-	if r.FormValue("clear_auth") == "1" {
-		sec.Auth = ""
-	}
-	src.Secret = s.eng.SealSecret(sec)
-
-	if src.Name == "" {
-		fail(w, http.StatusBadRequest, "Give the source a name.")
+	src, err := s.lib.SaveSource(r.Context(), currentUser(r).ID, r.PathValue("id"), in, sec)
+	if failed(w, err) {
 		return
-	}
-	switch src.Kind {
-	case "http":
-		if !strings.HasPrefix(src.URL, "http://") && !strings.HasPrefix(src.URL, "https://") {
-			fail(w, http.StatusBadRequest, "The URL must start with https:// (or http://).")
-			return
-		}
-		if src.Method != "GET" && src.Method != "POST" && src.Method != "PUT" && src.Method != "PATCH" {
-			src.Method = "GET"
-		}
-		if src.Body != "" && src.Method != "GET" && !json.Valid([]byte(src.Body)) {
-			fail(w, http.StatusBadRequest, "The request body isn't valid JSON.")
-			return
-		}
-	case "static":
-		src.LastData = fetch.ToJSON([]byte(strings.TrimSpace(r.FormValue("static_data"))))
-		src.LastFetchedAt = time.Now().Unix()
-		src.LastError = ""
-	case "push":
-		if src.PushToken == "" {
-			src.PushToken = store.RandomToken(16)
-		}
-	default:
-		fail(w, http.StatusBadRequest, "Pick a source type.")
-		return
-	}
-	if err := s.st.SaveSource(r.Context(), src); err != nil {
-		fail(w, http.StatusBadRequest, "Could not save: "+err.Error())
-		return
-	}
-	if src.Kind == "http" {
-		// Fetch right away so the response is ready to map onto screens.
-		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-		_ = s.eng.Refresh(ctx, src)
-		cancel()
-	} else {
-		s.eng.PushSource(r.Context(), src.ID)
 	}
 	redirect(w, "/sources/"+src.ID)
 }
 
-// stripParams removes secret keys from a URL in case they were also typed there.
-func stripParams(raw string, params []fetch.Param) string {
-	if len(params) == 0 {
-		return raw
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return raw
-	}
-	drop := map[string]bool{}
-	for _, p := range params {
-		drop[p.K] = true
-	}
-	// Edit the raw query by hand so the remaining params keep their order and encoding.
-	var keep []string
-	for _, part := range strings.Split(u.RawQuery, "&") {
-		k, _, _ := strings.Cut(part, "=")
-		if dk, err := url.QueryUnescape(k); part != "" && (err != nil || !drop[dk]) {
-			keep = append(keep, part)
-		}
-	}
-	u.RawQuery = strings.Join(keep, "&")
-	return u.String()
-}
-
 func (s *Server) fetchSource(w http.ResponseWriter, r *http.Request) {
-	u := currentUser(r)
-	src, err := s.st.UserSource(r.Context(), u.ID, r.PathValue("id"))
-	if notFound(w, err) {
+	src, err := s.lib.FetchSource(r.Context(), currentUser(r).ID, r.PathValue("id"))
+	if failed(w, err) {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-	_ = s.eng.Refresh(ctx, src)
-	cancel()
-	src, _ = s.st.UserSource(r.Context(), u.ID, src.ID)
 	writeJSON(w, http.StatusOK, s.sourceData(src))
 }
 

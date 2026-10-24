@@ -12,10 +12,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"makerapp/internal/engine"
+	"makerapp/internal/fetch"
+	"makerapp/internal/library"
+	"makerapp/internal/limit"
 	"makerapp/internal/render"
 	"makerapp/internal/store"
 )
@@ -24,24 +26,25 @@ type Config struct {
 	PublicURL     string // e.g. https://maker.app.rabeeta.xyz; derived from the request when empty
 	AllowSignup   bool
 	SecureCookies bool
-	Frontend      http.Handler // the website; serves every path not claimed here
+	Frontend      http.Handler  // the website; serves every path not claimed here
+	MCP           http.Handler  // the MCP connector; served at /mcp to signed-in AI clients
+	Fetch         *fetch.Client // outbound requests: MCP clients' metadata documents
 }
 
 type Server struct {
 	cfg Config
 	st  *store.Store
 	eng *engine.Engine
+	lib *library.Library
 	log *slog.Logger
-
-	limiterMu sync.Mutex
-	attempts  map[string][]time.Time
+	lim *limit.Limiter // login, signup and pairing attempts
 }
 
-func New(cfg Config, st *store.Store, eng *engine.Engine, log *slog.Logger) *Server {
+func New(cfg Config, st *store.Store, eng *engine.Engine, lib *library.Library, log *slog.Logger) *Server {
 	if cfg.Frontend == nil {
 		cfg.Frontend = http.NotFoundHandler()
 	}
-	return &Server{cfg: cfg, st: st, eng: eng, log: log, attempts: map[string][]time.Time{}}
+	return &Server{cfg: cfg, st: st, eng: eng, lib: lib, log: log, lim: limit.New()}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -109,6 +112,22 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/screens/{id}", s.auth(s.saveScreen))
 	mux.HandleFunc("POST /api/screens/{id}/delete", s.auth(s.deleteScreen))
 
+	// The MCP connector and its sign-in (OAuth 2.1). /oauth/authorize itself is
+	// a page of the website; it uses the /api/oauth endpoints.
+	if s.cfg.MCP != nil {
+		mux.HandleFunc("/mcp", s.mcp)
+	}
+	mux.HandleFunc("/.well-known/oauth-protected-resource", publicCORS(s.resourceMetadata))
+	mux.HandleFunc("/.well-known/oauth-protected-resource/mcp", publicCORS(s.resourceMetadata))
+	mux.HandleFunc("/.well-known/oauth-authorization-server", publicCORS(s.authServerMetadata))
+	mux.HandleFunc("POST /oauth/register", publicCORS(s.register))
+	mux.HandleFunc("POST /oauth/token", publicCORS(s.token))
+	mux.HandleFunc("OPTIONS /oauth/", publicCORS(nil))
+	mux.HandleFunc("GET /api/oauth/authorize", s.auth(s.authorizeInfo))
+	mux.HandleFunc("POST /api/oauth/authorize", s.auth(s.authorize))
+	mux.HandleFunc("GET /api/oauth/grants", s.auth(s.grants))
+	mux.HandleFunc("POST /api/oauth/grants/{id}/revoke", s.auth(s.revokeGrant))
+
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { fail(w, http.StatusNotFound, "no such endpoint") })
 	// Screens live inside apps now; old links still land somewhere useful.
 	mux.HandleFunc("GET /screens", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/apps", http.StatusSeeOther) })
@@ -134,6 +153,16 @@ func redirect(w http.ResponseWriter, to string) {
 // fail answers with a message the website shows to the user.
 func fail(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// failed answers a library error: a user's mistake (400 with its message), a
+// missing record (404) or a server failure (500). It reports whether err was set.
+func failed(w http.ResponseWriter, err error) bool {
+	if e, ok := library.IsUserError(err); ok {
+		fail(w, http.StatusBadRequest, e.Msg)
+		return true
+	}
+	return notFound(w, err)
 }
 
 func notFound(w http.ResponseWriter, err error) bool {
@@ -194,11 +223,13 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// checkOrigin rejects cross-site posts (CSRF). Push endpoints are exempt:
-// scripts and services post to them.
+// checkOrigin rejects cross-site posts (CSRF), which only matter for requests
+// a browser sends with the session cookie. Push, OAuth and MCP endpoints are
+// exempt: scripts and AI clients call them with tokens, not cookies.
 func (s *Server) checkOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && !strings.HasPrefix(r.URL.Path, "/push/") {
+		p := r.URL.Path
+		if r.Method == http.MethodPost && !strings.HasPrefix(p, "/push/") && !strings.HasPrefix(p, "/oauth/") && p != "/mcp" {
 			if o := r.Header.Get("Origin"); o != "" {
 				u, err := url.Parse(o)
 				if err != nil || u.Host != r.Host {
@@ -215,29 +246,10 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		next.ServeHTTP(w, r)
-		if strings.HasPrefix(r.URL.Path, "/api/") {
+		if p := r.URL.Path; strings.HasPrefix(p, "/api/") || strings.HasPrefix(p, "/oauth/") || p == "/mcp" {
 			s.log.Debug("http", "method", r.Method, "path", r.URL.Path, "dur", time.Since(start))
 		}
 	})
-}
-
-// allow is a small per-key rate limiter for login and pairing attempts.
-func (s *Server) allow(key string, max int, per time.Duration) bool {
-	s.limiterMu.Lock()
-	defer s.limiterMu.Unlock()
-	cut := time.Now().Add(-per)
-	recent := s.attempts[key][:0]
-	for _, t := range s.attempts[key] {
-		if t.After(cut) {
-			recent = append(recent, t)
-		}
-	}
-	if len(recent) >= max {
-		s.attempts[key] = recent
-		return false
-	}
-	s.attempts[key] = append(recent, time.Now())
-	return true
 }
 
 // ---- public URL ----

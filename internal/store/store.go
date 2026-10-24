@@ -517,6 +517,21 @@ func (s *Store) DeleteScreen(ctx context.Context, userID, id string) error {
 	return err
 }
 
+// SetScreenOrder puts an app's screens in the order of ids.
+func (s *Store) SetScreenOrder(ctx context.Context, appID string, ids []string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for i, id := range ids {
+		if _, err := tx.ExecContext(ctx, `UPDATE screens SET app_pos = ? WHERE id = ? AND app_id = ?`, i, id, appID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // MoveAppScreen shifts a screen one place earlier (-1) or later (+1) in its app.
 func (s *Store) MoveAppScreen(ctx context.Context, appID, screenID string, delta int) error {
 	screens, err := s.AppScreens(ctx, appID)
@@ -558,16 +573,17 @@ type App struct {
 	CreatedAt   int64
 	Description string // shown in the public list
 	PublishedAt int64  // 0 unless anyone can install it
+	MadeBy      string // the AI client that made it over MCP ("Claude"); "" if made on the website
 }
 
-const appCols = `id, user_id, name, cycle_sec, updated_at, created_at, description, published_at`
+const appCols = `id, user_id, name, cycle_sec, updated_at, created_at, description, published_at, made_by`
 
 const appSelect = `a.id, a.user_id, a.name, a.cycle_sec, unixepoch(a.updated_at), unixepoch(a.created_at), a.description,
-	COALESCE(unixepoch(a.published_at), 0)`
+	COALESCE(unixepoch(a.published_at), 0), a.made_by`
 
 func scanApp(row interface{ Scan(...any) error }) (*App, error) {
 	a := &App{}
-	err := row.Scan(&a.ID, &a.UserID, &a.Name, &a.CycleSec, &a.UpdatedAt, &a.CreatedAt, &a.Description, &a.PublishedAt)
+	err := row.Scan(&a.ID, &a.UserID, &a.Name, &a.CycleSec, &a.UpdatedAt, &a.CreatedAt, &a.Description, &a.PublishedAt, &a.MadeBy)
 	return a, notFound(err)
 }
 
@@ -597,8 +613,8 @@ func (s *Store) SaveApp(ctx context.Context, a *App) error {
 	if a.ID == "" {
 		a.ID = NewID()
 		a.CreatedAt = a.UpdatedAt
-		_, err := s.db.ExecContext(ctx, `INSERT INTO apps (`+appCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			a.ID, a.UserID, a.Name, a.CycleSec, iso(a.UpdatedAt), iso(a.CreatedAt), a.Description, iso(a.PublishedAt))
+		_, err := s.db.ExecContext(ctx, `INSERT INTO apps (`+appCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			a.ID, a.UserID, a.Name, a.CycleSec, iso(a.UpdatedAt), iso(a.CreatedAt), a.Description, iso(a.PublishedAt), a.MadeBy)
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE apps SET name = ?, cycle_sec = ?, updated_at = ?, description = ?, published_at = ?
@@ -648,7 +664,7 @@ func (s *Store) PublishedApps(ctx context.Context) ([]PublishedApp, error) {
 	for rows.Next() {
 		p := PublishedApp{App: &App{}}
 		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.CycleSec, &p.UpdatedAt, &p.CreatedAt, &p.Description,
-			&p.PublishedAt, &p.Publisher); err != nil {
+			&p.PublishedAt, &p.MadeBy, &p.Publisher); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -662,7 +678,7 @@ func (s *Store) InstallableApp(ctx context.Context, userID, id string) (a *App, 
 	a = &App{}
 	err = s.db.QueryRowContext(ctx, `SELECT `+appSelect+`, CASE WHEN a.user_id = ? THEN '' ELSE COALESCE(u.username, '') END
 		FROM apps a JOIN users u ON u.id = a.user_id WHERE a.id = ? AND (a.user_id = ? OR a.published_at IS NOT NULL)`, userID, id, userID).
-		Scan(&a.ID, &a.UserID, &a.Name, &a.CycleSec, &a.UpdatedAt, &a.CreatedAt, &a.Description, &a.PublishedAt, &publisher)
+		Scan(&a.ID, &a.UserID, &a.Name, &a.CycleSec, &a.UpdatedAt, &a.CreatedAt, &a.Description, &a.PublishedAt, &a.MadeBy, &publisher)
 	return a, publisher, notFound(err)
 }
 

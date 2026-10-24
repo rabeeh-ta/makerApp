@@ -12,6 +12,7 @@ import (
 
 	"makerapp/internal/engine"
 	"makerapp/internal/games"
+	"makerapp/internal/library"
 	"makerapp/internal/store"
 )
 
@@ -94,23 +95,10 @@ func (s *Server) installedOn(r *http.Request, devices []*store.Device) map[strin
 }
 
 func (s *Server) newApp(w http.ResponseWriter, r *http.Request) {
-	u := currentUser(r)
-	name := strings.TrimSpace(r.FormValue("name"))
-	if name == "" {
-		name = "My app"
-	}
-	a := &store.App{UserID: u.ID, Name: name}
-	if err := s.st.SaveApp(r.Context(), a); err != nil {
-		fail(w, http.StatusInternalServerError, "server error")
+	// Made from a device page: installed there right away.
+	a, err := s.lib.CreateApp(r.Context(), currentUser(r).ID, r.FormValue("name"), r.FormValue("device"), "")
+	if failed(w, err) {
 		return
-	}
-	// Made from a device page: install it there right away.
-	if d, err := s.st.UserDevice(r.Context(), u.ID, r.FormValue("device")); err == nil {
-		if err := s.st.InstallApp(r.Context(), d.ID, a.ID); err != nil {
-			fail(w, http.StatusInternalServerError, "server error")
-			return
-		}
-		s.eng.PushDevice(r.Context(), d.ID)
 	}
 	redirect(w, "/apps/"+a.ID)
 }
@@ -233,15 +221,10 @@ func (s *Server) saveApp(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if name := strings.TrimSpace(r.FormValue("name")); name != "" {
-		a.Name = name
-	}
-	a.CycleSec = clamp(atoi(r.FormValue("cycle_sec"), a.CycleSec), 0, 3600)
-	if err := s.st.SaveApp(r.Context(), a); err != nil {
-		fail(w, http.StatusInternalServerError, "server error")
+	name, cycle := r.FormValue("name"), atoi(r.FormValue("cycle_sec"), a.CycleSec)
+	if _, err := s.lib.UpdateApp(r.Context(), a.UserID, a.ID, library.AppChanges{Name: &name, CycleSec: &cycle}); failed(w, err) {
 		return
 	}
-	s.eng.PushApp(r.Context(), a.ID)
 	redirect(w, "/apps/"+a.ID+"?saved=1")
 }
 
@@ -262,20 +245,15 @@ func (s *Server) deleteApp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) moveAppScreen(w http.ResponseWriter, r *http.Request) {
-	a, ok := s.loadApp(w, r)
-	if !ok {
-		return
-	}
 	delta := 1
 	if r.FormValue("dir") == "up" {
 		delta = -1
 	}
-	if err := s.st.MoveAppScreen(r.Context(), a.ID, r.PathValue("sid"), delta); err != nil {
-		fail(w, http.StatusInternalServerError, "server error")
+	appID := r.PathValue("id")
+	if failed(w, s.lib.MoveScreen(r.Context(), currentUser(r).ID, appID, r.PathValue("sid"), delta)) {
 		return
 	}
-	s.eng.PushApp(r.Context(), a.ID)
-	redirect(w, "/apps/"+a.ID)
+	redirect(w, "/apps/"+appID)
 }
 
 func (s *Server) installApp(w http.ResponseWriter, r *http.Request)   { s.setInstalled(w, r, true) }
@@ -284,27 +262,10 @@ func (s *Server) uninstallApp(w http.ResponseWriter, r *http.Request) { s.setIns
 // setInstalled installs or removes the app in the path on the device in the
 // form, then goes back to the page the form came from.
 func (s *Server) setInstalled(w http.ResponseWriter, r *http.Request, on bool) {
-	u := currentUser(r)
-	d, err := s.st.UserDevice(r.Context(), u.ID, r.FormValue("device"))
-	if notFound(w, err) {
+	d, err := s.lib.SetInstalled(r.Context(), currentUser(r).ID, r.FormValue("device"), r.PathValue("id"), on, false)
+	if failed(w, err) {
 		return
 	}
-	id := r.PathValue("id")
-	if _, ok := engine.CatalogEntry(id); !ok && on {
-		if _, _, err := s.st.InstallableApp(r.Context(), u.ID, id); notFound(w, err) {
-			return
-		}
-	}
-	if on {
-		err = s.st.InstallApp(r.Context(), d.ID, id)
-	} else {
-		err = s.st.UninstallApp(r.Context(), d.ID, id)
-	}
-	if err != nil {
-		fail(w, http.StatusInternalServerError, "server error")
-		return
-	}
-	s.eng.PushDevice(r.Context(), d.ID)
 	redirect(w, backTo(r, "/devices/"+d.ID))
 }
 

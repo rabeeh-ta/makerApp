@@ -41,6 +41,24 @@ A board that wasn't flashed from your account (or was removed from it) shows a
 6-digit code: enter it under **Devices → Enter it here**, or open the link the
 board shows.
 
+### Build with AI (MCP)
+
+makerApp is an MCP server at `https://maker.app.rabeeta.xyz/mcp`. Connect Claude
+(Settings → Connectors → Add custom connector), Claude Code
+(`claude mcp add --transport http makerapp <url>`), Codex
+(`codex mcp add makerapp --url <url>`) or another MCP app, sign in to makerApp and
+press **Allow**, then describe the app you want. The AI sees your boards, apps and data
+sources, explores APIs, creates sources, apps and screens, and installs your apps on your
+boards. Each screen it makes comes back with checks (text that won't fit the board's
+font, paths that aren't in the data), so it fixes them before you see them. It can't see
+or add API keys (it gives you the source's link to add one), delete anything, publish, or
+install apps other people published. **Apps → Build with AI** has the steps and the
+connected apps, with **Disconnect**.
+
+Under the hood: OAuth 2.1 with PKCE (client ID metadata documents or dynamic
+registration), opaque tokens stored hashed, Streamable HTTP in stateless mode. The tools
+are in `internal/mcpserver`, the sign-in in `internal/web/oauth.go`.
+
 ### Templates
 
 Text fields take [gjson paths](https://github.com/tidwall/gjson/blob/master/SYNTAX.md)
@@ -209,7 +227,9 @@ internal/games            the downloadable Lua games (embedded; served at /games
 internal/render           templates → device payload, data explorer paths
 internal/store            queries (apps, screens, installs)
 internal/fw               embedded firmware, ESP Web Tools manifest, config image
-internal/web              JSON API, auth, flashing, pairing, device-facing routes
+internal/web              JSON API, auth, flashing, pairing, device-facing routes, MCP sign-in (OAuth)
+internal/library          the rules for changing sources, apps, screens and installs (website and MCP)
+internal/mcpserver        the MCP connector: tools and instructions for AI apps
 web/                      React + TypeScript (Vite); ESP Web Tools in public/static/ewt
 firmware/                 PlatformIO project (Arduino, Adafruit GFX/ST7789, ArduinoJson, WebSockets)
   src/main.cpp            state machine: WiFi → server → pairing → Apps drawer, apps, Settings, OTA

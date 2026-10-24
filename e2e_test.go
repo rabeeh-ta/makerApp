@@ -20,6 +20,7 @@ import (
 	"makerapp/internal/engine"
 	"makerapp/internal/fetch"
 	"makerapp/internal/games"
+	"makerapp/internal/library"
 	"makerapp/internal/secret"
 	"makerapp/internal/store"
 	"makerapp/internal/web"
@@ -42,7 +43,7 @@ func TestDeviceFlow(t *testing.T) {
 	box, _ := secret.New("test")
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	eng := engine.New(st, box, fetch.New(true), time.UTC, log)
-	site := web.New(web.Config{AllowSignup: true}, st, eng, log)
+	site := web.New(web.Config{AllowSignup: true}, st, eng, library.New(st, eng), log)
 	srv := httptest.NewServer(site.Handler())
 	defer srv.Close()
 

@@ -27,10 +27,13 @@ export function Apps({ me }: { me: Me }) {
             Install apps on a board and they show up in its Apps drawer. Make your own from screens, and publish them for anyone to install.
           </p>
         </div>
-        <form onSubmit={newApp.submit('/api/apps')} className="row">
-          <input name="name" placeholder="New app name" maxLength={40} required className="inline-input" />
-          <button className="btn" disabled={newApp.busy}>New app</button>
-        </form>
+        <div className="row">
+          <Link className="btn ghost" to="/connect">Build with AI</Link>
+          <form onSubmit={newApp.submit('/api/apps')} className="row">
+            <input name="name" placeholder="New app name" maxLength={40} required className="inline-input" />
+            <button className="btn" disabled={newApp.busy}>New app</button>
+          </form>
+        </div>
       </div>
       <ErrorNotice error={newApp.error} />
 
@@ -45,6 +48,7 @@ export function Apps({ me }: { me: Me }) {
                 <span className="muted small">{plural(a.ScreenCount, 'screen')}</span>
               </div>
               <div className="muted small">{a.On?.length ? `On ${a.On.map((d) => d.Name).join(', ')}` : 'Not installed'}</div>
+              {a.MadeBy && <span className="pill made-by">Made with {a.MadeBy}</span>}
               {a.PublishedAt > 0 && (
                 <div className="row public-row">
                   <span className="pill ok">Public</span>

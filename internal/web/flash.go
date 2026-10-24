@@ -166,7 +166,7 @@ func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
 	u := currentUser(r)
 	code := strings.ReplaceAll(strings.TrimSpace(r.FormValue("code")), " ", "")
 	fail := func(msg string) { writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg}) }
-	if !s.allow("pair:"+u.ID, 10, time.Minute) {
+	if !s.lim.Allow("pair:"+u.ID, 10, time.Minute) {
 		fail("Too many attempts. Wait a minute.")
 		return
 	}

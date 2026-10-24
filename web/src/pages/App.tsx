@@ -38,6 +38,7 @@ export function AppPage({ id }: { id: string }) {
             <Link to="/apps">Apps</Link> /
           </p>
           <h1>{app.Name}</h1>
+          {app.MadeBy && <span className="pill made-by">Made with {app.MadeBy}</span>}
         </div>
         <PostButton action={`/api/apps/${app.ID}/delete`} className="btn danger" confirm={`Delete “${app.Name}” and its screens? Boards with it installed lose it.`}>
           Delete app

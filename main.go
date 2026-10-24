@@ -30,6 +30,8 @@ import (
 	"makerapp/internal/engine"
 	"makerapp/internal/fetch"
 	"makerapp/internal/fw"
+	"makerapp/internal/library"
+	"makerapp/internal/mcpserver"
 	"makerapp/internal/secret"
 	"makerapp/internal/store"
 	"makerapp/internal/web"
@@ -79,16 +81,24 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	eng := engine.New(st, box, fetch.New(envBool("ALLOW_PRIVATE_FETCH", false)), time.Local, log)
+	fc := fetch.New(envBool("ALLOW_PRIVATE_FETCH", false))
+	eng := engine.New(st, box, fc, time.Local, log)
 	go eng.Run(ctx)
+	lib := library.New(st, eng)
 
 	publicURL := os.Getenv("PUBLIC_URL")
+	links := publicURL // where MCP answers link back to
+	if links == "" {
+		links = "http://localhost:" + port
+	}
 	site := web.New(web.Config{
 		PublicURL:     publicURL,
 		AllowSignup:   envBool("ALLOW_SIGNUP", true),
 		SecureCookies: strings.HasPrefix(publicURL, "https://"),
 		Frontend:      frontend(webDist),
-	}, st, eng, log)
+		MCP:           mcpserver.Handler(mcpserver.Deps{Store: st, Engine: eng, Library: lib, Fetch: fc, PublicURL: links, Log: log}),
+		Fetch:         fc,
+	}, st, eng, lib, log)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz(db))

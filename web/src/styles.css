@@ -560,3 +560,15 @@ form.stack > .btn { align-self: flex-end; }
 .pair-card.wide { display: flex; align-items: center; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap; margin-bottom: 28px; }
 .pair-card.wide .pair-form { margin-top: 0; flex: 0 1 380px; }
 .pair-card .notice { margin: 14px 0 0; }
+
+/* ---- building with AI (MCP) ---- */
+.made-by { align-self: flex-start; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.connect-url { margin-bottom: 20px; }
+.connect-url input { font-size: 14px; }
+.connect-steps { margin-bottom: 8px; }
+.command { display: flex; gap: 8px; align-items: flex-start; }
+.command pre.json { flex: 1; min-width: 0; margin: 0; white-space: pre-wrap; word-break: break-all; }
+.examples p { margin: 0 0 8px; }
+.examples p:last-child { margin: 12px 0 0; }
+.consent ul { margin: 0 0 16px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.consent-actions { justify-content: flex-end; margin-top: 8px; }
