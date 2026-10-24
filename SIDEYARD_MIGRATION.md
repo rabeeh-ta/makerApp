@@ -1,9 +1,9 @@
 # Moving makerApp onto Sideyard
 
-Status: **Phase 2 done; Phase 4 (local checks, launch) in progress (2026-10-24).** The
-API, the React site, the firmware rename (3.1.1) and the README are in. Local checks passed,
-including the real board on firmware 3.1.1. Next: deploy, domain, flash the board from the
-live site.
+Status: **Live (2026-10-24).** makerApp runs on Sideyard at `https://maker.app.rabeeta.xyz`
+from `master` (release #2 was the first live one, from `sideyard`). The board runs firmware
+3.1.1 and is connected to it, waiting to be paired: sign up on the site and enter the
+6-digit code on its screen (Devices → Enter it here).
 
 **Name (decided 2026-10-24):** the platform is **makerApp** and the board is
 **makerDevice**. espHog was the first name and is no longer used, so Phase 2 renames it
@@ -520,8 +520,18 @@ Checked on the first deploy, not blocking Phase 2:
 1. **CPU architecture: arm64** (found on the first deploy, 2026-10-24). Sideyard refused
    the amd64 binary before it went live. `SIDEYARD_ARCH=arm64` is a repo variable and
    the Makefile's default.
-2. **`X-Forwarded-For`** (D5). Log it once on the deployed app and confirm the rightmost
-   entry is the visitor's IP.
+2. **`X-Forwarded-For`** (D5): checked in Sideyard's source. Its Caddy `reverse_proxy` has
+   no `trusted_proxies`, so Caddy drops any `X-Forwarded-For` a client sends and sets the
+   real client IP; the last entry is that IP.
 
-Needed from you at launch (Phase 4): create the `maker` project in the dashboard, a deploy
-token for `SIDEYARD_TOKEN` (GitHub secret), and the `SECRET_KEY` value (D4).
+Launch (2026-10-24): `SECRET_KEY`, `PUBLIC_URL=https://maker.app.rabeeta.xyz` and
+`TZ=Asia/Kolkata` are in the Variables tab. The repo has the secret `SIDEYARD_TOKEN` and the
+variables `SIDEYARD_URL`, `SIDEYARD_PROJECT=maker` and `SIDEYARD_ARCH=arm64`. The domain
+already pointed at the project; HTTPS works, `/healthz` answers, and WebSocket upgrades on
+`/ws` pass through (101 with `makerdevice`). The board's `hogcfg` was rewritten over USB to
+`wss://maker.app.rabeeta.xyz/ws` with no claim (the account is yours to create), and it
+connected (`device connected … fw=3.1.1` in the Logs tab). The workflow now deploys on
+pushes to `master`.
+
+Left for you: sign up at `https://maker.app.rabeeta.xyz` and pair the board with the code
+on its screen. Keep the `SECRET_KEY` from the Variables tab in your password manager.

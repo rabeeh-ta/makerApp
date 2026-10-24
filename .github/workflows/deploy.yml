@@ -8,7 +8,7 @@ name: Deploy to Sideyard
 
 on:
   push:
-    branches: [sideyard]
+    branches: [master]
   workflow_dispatch:
 
 concurrency:
