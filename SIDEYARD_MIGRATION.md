@@ -517,9 +517,9 @@ Answered on 2026-10-24:
 
 Checked on the first deploy, not blocking Phase 2:
 
-1. **CPU architecture.** The build defaults to amd64, like this Makefile and the other
-   Sideyard apps. If the server is ARM, that release fails its health check and never
-   goes live; then set `SIDEYARD_ARCH=arm64` and deploy again.
+1. **CPU architecture: arm64** (found on the first deploy, 2026-10-24). Sideyard refused
+   the amd64 binary before it went live. `SIDEYARD_ARCH=arm64` is a repo variable and
+   the Makefile's default.
 2. **`X-Forwarded-For`** (D5). Log it once on the deployed app and confirm the rightmost
    entry is the visitor's IP.
 

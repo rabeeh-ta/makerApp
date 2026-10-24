@@ -8,7 +8,8 @@
 #   make test         run the game check and the Go tests
 #   make games-check  run every downloadable game on this computer (bin/gamecheck)
 
-GOARCH ?= amd64
+# The Sideyard server is ARM (linux/arm64).
+GOARCH ?= arm64
 
 FW_DIR   := firmware
 FW_OUT   := $(FW_DIR)/.pio/build/feather_s3_rtft

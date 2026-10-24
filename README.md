@@ -168,8 +168,8 @@ SIDEYARD_TOKEN=sy_...
 ```
 
 The repository needs the secret `SIDEYARD_TOKEN` and the variables
-`SIDEYARD_URL` and `SIDEYARD_PROJECT` (plus `SIDEYARD_ARCH=arm64` on an ARM
-server). Boards are told to reconnect when a release takes over and land on the
+`SIDEYARD_URL`, `SIDEYARD_PROJECT` and `SIDEYARD_ARCH=arm64`: the server is ARM,
+and Sideyard refuses a binary built for another architecture. Boards are told to reconnect when a release takes over and land on the
 new one within seconds.
 
 ### Settings
