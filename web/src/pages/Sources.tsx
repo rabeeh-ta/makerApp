@@ -1,4 +1,4 @@
-import { DataTabs, Loading } from '../components/common'
+import { Loading } from '../components/common'
 import { ago, plural, useTitle } from '../lib/format'
 import { Link, useData } from '../lib/router'
 import type { Source } from '../lib/types'
@@ -12,11 +12,10 @@ export function Sources() {
     <>
       <div className="page-head">
         <div>
-          <h1>Data</h1>
+          <h1>Data sources</h1>
         </div>
         <Link className="btn" to="/sources/new">New source</Link>
       </div>
-      <DataTabs tab="sources" />
       {list.length ? (
         <div className="table card">
           <div className="tr th">

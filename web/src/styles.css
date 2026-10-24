@@ -572,4 +572,4 @@ form.stack > .btn { align-self: flex-end; }
 .examples p:last-child { margin: 12px 0 0; }
 .consent ul { margin: 0 0 16px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 .consent-actions { justify-content: flex-end; margin-top: 8px; }
-.connect-lead { margin: 0 0 18px; max-width: 720px; }
+.connect-lead { margin: 6px 0 0; max-width: 720px; }

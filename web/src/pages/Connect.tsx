@@ -1,4 +1,4 @@
-import { DataTabs, Loading } from '../components/common'
+import { Loading } from '../components/common'
 import { ago, useTitle } from '../lib/format'
 import { PostButton, useData } from '../lib/router'
 import { toast } from '../lib/toast'
@@ -12,10 +12,10 @@ const examples = [
   'My weather screen is blank. Fix it.',
 ]
 
-// Connect is the Data section's AI connector tab: how to connect Claude,
-// Codex and other MCP apps, and the ones connected now.
+// Connect is the AI Builder: how to connect Claude, Codex and other MCP
+// apps to makerApp, and the ones connected now.
 export function Connect() {
-  useTitle('AI connector')
+  useTitle('AI Builder')
   const { data, error } = useData<{ Grants: Grant[] | null; URL: string }>('/api/oauth/grants')
   if (!data) return <Loading error={error} />
   const url = data.URL
@@ -33,14 +33,13 @@ export function Connect() {
     <>
       <div className="page-head">
         <div>
-          <h1>Data</h1>
+          <h1>AI Builder</h1>
+          <p className="muted connect-lead">
+            Connect Claude, Codex or another AI app to makerApp over MCP, describe the app you want, and it builds it here: data sources, apps
+            and screens. It can install it on your board too.
+          </p>
         </div>
       </div>
-      <DataTabs tab="ai" />
-      <p className="muted connect-lead">
-        Connect Claude, Codex or another AI app to makerApp over MCP, describe the app you want, and it builds it here: data sources, apps and
-        screens. It can install it on your board too.
-      </p>
 
       <section className="card connect-url">
         <h3>Connector URL</h3>
