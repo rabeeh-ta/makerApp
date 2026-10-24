@@ -1,8 +1,9 @@
 # Moving makerApp onto Sideyard
 
-Status: **Phase 2 in progress on branch `sideyard` (2026-10-24).** Steps 1 and 2 are done
-(section 8, Progress); the old template UI still runs on the new store. Next: step 3, the
-JSON API. `SECRET_KEY` is set in the `maker` project's Variables tab.
+Status: **Phase 2 done; Phase 4 (local checks, launch) in progress (2026-10-24).** The
+API, the React site, the firmware rename (3.1.1) and the README are in. Local checks passed,
+including the real board on firmware 3.1.1. Next: deploy, domain, flash the board from the
+live site.
 
 **Name (decided 2026-10-24):** the platform is **makerApp** and the board is
 **makerDevice**. espHog was the first name and is no longer used, so Phase 2 renames it
@@ -440,11 +441,35 @@ and no real downgrade of an existing feature. None of these cause one.
   schema, with new tests for session and claim expiry, the pairing window and due sources.
   Checked: `go vet`, `go test ./...`, `make games-check`, and a local run (health check,
   pages, `/_jobs` 401, exit 0.02 s after SIGTERM, refusal without `SECRET_KEY` on Sideyard).
-- [ ] Step 3: JSON API
-- [ ] Step 4: `web/` React app
-- [ ] Step 5: mount the frontend, delete the templates, rewrite the README
-- [ ] D8 + firmware side of D6: `DEFAULT_SERVER`, `makerdevice` subprotocol, comments,
-  version 3.1.1, `make firmware`
+- [x] **Step 3** (2026-10-24). Every route in section 4 is a `/api` endpoint answering
+  JSON: page data, `{redirect}` after a form post that worked, `{error}` with the old
+  message and status code otherwise. Forms still post urlencoded fields, so the handlers'
+  parsing is unchanged. Claims are made with `POST /api/flash/claims`; the pair link is
+  `POST /api/pair/try`. `GET /api/me` is new. `PasswordHash`, `TokenHash`, `PairCode` and
+  `Source.Secret` are `json:"-"`. `e2e_test.go` drives the API: the board flow as before,
+  plus pairing by link and by code, a 3.1.0 board on the `esphog` subprotocol, the 401
+  without a session, cross-site posts, unknown `/api` paths, and no secrets in responses.
+- [x] **Step 4** (2026-10-24). `web/` is React 19 + TypeScript (Vite) from the starter, with
+  the old `style.css` unchanged. A ~100-line history router (`web/src/lib/router.tsx`),
+  `DeviceScreen` (with the game art), `JsonTree`, and one page per old template. Polling as
+  before: device cards and badges every 5 s, flash and pair status every 2 s.
+- [x] **Step 5** (2026-10-24). The frontend serves every path the Go routes don't claim;
+  `/screens` still redirects to `/apps`. Deleted: `internal/web/templates/` (layout, 12
+  pages, 4 partials), `internal/web/static/{style.css,app.js,data.js,htmx.min.js}`, the
+  template functions, `render`/`partial`, `assetVersion`, `sparkPoints` (now in
+  `web/src/lib/format.ts`). ESP Web Tools moved to `web/public/static/ewt` (same URL).
+  README rewritten for Sideyard.
+- [x] **D8 + firmware side of D6** (2026-10-24). `DEFAULT_SERVER` and the fallback URL are
+  `maker.app.rabeeta.xyz`, the subprotocol is `makerdevice`, comments say makerDevice,
+  version 3.1.1, built with `make firmware` and committed.
+- [x] **Local checks** (2026-10-24). In Chrome against the built binary: sign up, log
+  out, log in (wrong password message, `next`), flash page, the board connecting, device
+  message, data source from a template (row ↔ URL sync, save and fetch, Raw tab, Fetch now),
+  screen editor (field insertion, live preview, save into a new app installed on the board),
+  install from All apps, reorder, app rename, pair page, 404. The real board was flashed
+  with 3.1.1 over USB (`esptool`, same parts and offsets as the web installer) with a local
+  config image; it joined the account through its claim, and after a server restart it
+  reconnected by itself.
 
 **Phase 3:** skipped (fresh start, 5.5).
 

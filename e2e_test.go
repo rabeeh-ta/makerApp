@@ -336,6 +336,50 @@ func TestDeviceFlow(t *testing.T) {
 		t.Fatalf("unknown API path: %d %+v", code, missing)
 	}
 
+	// Boards that connect without a claim show a 6-digit code: one pairs from
+	// the link on its screen, another by typing the code.
+	unpaired := func(id, code string) *websocket.Conn {
+		t.Helper()
+		c, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{Subprotocols: []string{"esphog"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := json.Marshal(map[string]any{"type": "hello", "id": id, "token": "fedcba9876543210fedc", "code": code, "fw": "3.1.0"})
+		_ = c.Write(ctx, websocket.MessageText, b)
+		_, reply, _ := c.Read(ctx)
+		if !strings.Contains(string(reply), `"type":"pair"`) {
+			t.Fatalf("unclaimed board should be asked to pair: %s", reply)
+		}
+		return c
+	}
+	linked := unpaired("112233445566", "654321")
+	defer linked.CloseNow()
+	var try struct {
+		Redirect, Error string
+		Waiting         bool
+	}
+	if call("/api/pair/try", url.Values{"device": {"112233445566"}, "code": {"000000"}}, &try); try.Error == "" {
+		t.Fatalf("a wrong code should be refused: %+v", try)
+	}
+	if call("/api/pair/try", url.Values{"device": {"778899AABBCC"}, "code": {"654321"}}, &try); !try.Waiting {
+		t.Fatalf("a board that hasn't connected yet should be waited for: %+v", try)
+	}
+	if call("/api/pair/try", url.Values{"device": {"112233445566"}, "code": {"654321"}}, &try); try.Redirect != "/devices/112233445566?paired=1" {
+		t.Fatalf("pairing from the link: %+v", try)
+	}
+	typed := unpaired("665544332211", "111222")
+	defer typed.CloseNow()
+	var bad struct{ Error string }
+	if code := call("/api/pair", url.Values{"code": {"12"}}, &bad); code != 400 || bad.Error == "" {
+		t.Fatalf("a short code should be refused: %d %+v", code, bad)
+	}
+	if to := post("/api/pair", url.Values{"code": {"111 222"}}); to != "/devices/665544332211?paired=1" {
+		t.Fatalf("pairing by code: %q", to)
+	}
+	if devices, _ := st.UserDevices(ctx, mustUser(t, st).ID); len(devices) != 3 {
+		t.Fatalf("want 3 boards on the account, got %d", len(devices))
+	}
+
 	// Another device with the same ID but a different secret is refused.
 	evil, _, err := websocket.Dial(ctx, wsURL, nil)
 	if err != nil {

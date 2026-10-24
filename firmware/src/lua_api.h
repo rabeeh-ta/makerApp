@@ -1,6 +1,6 @@
 #pragma once
 // The functions a downloadable Lua game can call (documented in
-// server/internal/games/README.md). The same bindings run on the board and in
+// internal/games/README.md). The same bindings run on the board and in
 // tools/gamecheck on a computer; each side supplies the gamehost functions.
 
 #include <stdint.h>

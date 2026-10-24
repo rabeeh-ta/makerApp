@@ -1,7 +1,8 @@
-// espHog firmware: connects to WiFi, keeps a WebSocket open to the espHog
-// server, and runs a small app launcher. The server sends the installed apps
-// (each an ordered list of screens); the board lists them in an Apps drawer
-// and pages through them on its own. D1 opens and closes an app, D0/D2 move.
+// makerDevice firmware: connects to WiFi, keeps a WebSocket open to the
+// makerApp server, and runs a small app launcher. The server sends the
+// installed apps (each an ordered list of screens); the board lists them in
+// an Apps drawer and pages through them on its own. D1 opens and closes an
+// app, D0/D2 move.
 // Settings is built in and always last in the drawer.
 
 #include <Arduino.h>
@@ -103,7 +104,7 @@ String hostOnly() {
   return i < 0 ? base : base.substring(i + 3);
 }
 
-// ---- apps (sent by server/internal/engine BuildState) ----
+// ---- apps (sent by internal/engine BuildState) ----
 
 JsonArrayConst apps() { return state["apps"].as<JsonArrayConst>(); }
 int appCount() { return apps().size(); }
@@ -471,9 +472,9 @@ void startWebSocket() {
     Serial.println("makerDevice: NTP sync failed; TLS will likely fail");
   }
   if (tls)
-    ws.beginSslWithCA(host.c_str(), port, path.c_str(), ROOT_CAS, "esphog");
+    ws.beginSslWithCA(host.c_str(), port, path.c_str(), ROOT_CAS, "makerdevice");
   else
-    ws.begin(host.c_str(), port, path.c_str(), "esphog");
+    ws.begin(host.c_str(), port, path.c_str(), "makerdevice");
   ws.onEvent(onWsEvent);
   ws.setReconnectInterval(4000);
   ws.enableHeartbeat(15000, 5000, 2);

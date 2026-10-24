@@ -87,6 +87,8 @@ func (s *Server) writeScreenEdit(w http.ResponseWriter, r *http.Request, sc *sto
 		"Sources":  sources,
 		"Preview":  toWeb(s.eng.PreviewScreen(r.Context(), &tmp, nil)),
 		"Explorer": s.explorerData(src),
+		// Values the board fills in itself, offered next to the source's fields.
+		"DeviceFields": render.DeviceFields,
 	})
 }
 

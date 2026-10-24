@@ -5,7 +5,7 @@
 #define FW_VERSION "dev"
 #endif
 
-#define DEFAULT_SERVER "wss://maker.rabeeta.xyz/ws"
+#define DEFAULT_SERVER "wss://maker.app.rabeeta.xyz/ws"
 
 // Everything the device remembers. WiFi, token and pairing code live in NVS;
 // server URL and claim token come from the "hogcfg" partition that the website

@@ -130,7 +130,7 @@ String configWebBase() {
   bool tls;
   String host, path;
   uint16_t port;
-  if (!parseServerUrl(cfg.server, tls, host, port, path)) return "https://maker.rabeeta.xyz";
+  if (!parseServerUrl(cfg.server, tls, host, port, path)) return "https://maker.app.rabeeta.xyz";
   String base = (tls ? "https://" : "http://") + host;
   if ((tls && port != 443) || (!tls && port != 80)) base += ":" + String(port);
   return base;

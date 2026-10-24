@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 
-// Downloadable Lua games (server/internal/games). The launcher calls gameOpen
+// Downloadable Lua games (internal/games). The launcher calls gameOpen
 // when a game's app is opened, gameTick every loop while it's on screen, and
 // forwards every press and release with gameButton. gameClose frees the game
 // entirely, so a game that isn't open uses no memory. Buttons are logical

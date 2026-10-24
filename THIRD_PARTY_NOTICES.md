@@ -2,7 +2,7 @@
 
 ## DeskHog
 
-`server/internal/games/flappy.lua` and `paddle.lua` port the Flappy Hog and
+`internal/games/flappy.lua` and `paddle.lua` port the Flappy Hog and
 Paddle games from [PostHog/DeskHog](https://github.com/PostHog/DeskHog)
 (`src/flappy_bird.cpp`, `src/game/PaddleGame.cpp`, `src/ui/PaddleCard.cpp`),
 under this license:

@@ -1,20 +1,22 @@
-# espHog
+# makerApp
 
-Put any API on the little screen on your desk. espHog is one Go binary that runs
-the website, the device connection, the data poller and the firmware flasher for
-a DeskHog-style board (Adafruit Feather ESP32-S3 Reverse TFT: 240×135 screen,
-buttons D0/D1/D2).
+Put any API on the little screen on your desk. makerApp is one Go binary that
+runs the website, the device connection, the data poller and the firmware
+flasher for makerDevice, a DeskHog-style board (Adafruit Feather ESP32-S3 Reverse
+TFT: 240×135 screen, buttons D0/D1/D2). It runs on Sideyard
+at `maker.app.rabeeta.xyz`.
 
 ```
-maker.rabeeta.xyz  ── one binary (bin/esphog) ──────────────────────────────
-  Website        sign up · flash a board from the browser · data · apps
+maker.app.rabeeta.xyz  ── one binary (./app) on Sideyard ─────────────────────
+  Website        React app: sign up · flash a board from the browser · data · apps
+  /api           the JSON API behind the website
   /ws            devices keep a WebSocket open; changes are pushed instantly
   Poller         runs each data source on its interval, re-renders, pushes
   Firmware       baked in; served to the browser flasher and for OTA updates
-  SQLite/Turso   one file locally, or libsql:// for Turso
+  SQLite         $DATABASE_PATH in the project's data folder
         ▲
-        │ wss://maker.rabeeta.xyz/ws (the device dials out, works behind any router)
-  ESP32-S3 board: WiFi → hello → Apps drawer → opens apps, pages screens
+        │ wss://maker.app.rabeeta.xyz/ws (the device dials out, works behind any router)
+  makerDevice board: WiFi → hello → Apps drawer → opens apps, pages screens
 ```
 
 ## Use it
@@ -25,14 +27,19 @@ maker.rabeeta.xyz  ── one binary (bin/esphog) ──────────
    settings block containing a one-time claim token, so the board shows up in your
    account by itself, with no ID or code to type.
 3. **Data → New source**: any HTTP request with a token, such as PostHog, HubSpot or
-   your own API. Presets only prefill the form. espHog fetches it on the interval
-   you choose and keeps the latest JSON. There are also *Fixed data* (type JSON in)
-   and *Push* (POST JSON to a private URL from scripts or Zapier) sources.
+   your own API. Templates only prefill the form. makerApp fetches it on the
+   interval you choose and keeps the latest JSON. There are also *Fixed data*
+   (type JSON in) and *Webhook* (POST JSON to a private URL from scripts or Zapier)
+   sources.
 4. **Apps → New app**, then **New screen** inside it: pick a layout (big number,
    list, text, sparkline, progress) and click fields from the data panel to
    insert `{{ path }}`. Saving updates every board with the app within a second.
 5. **Install** the app on a board, from the app's page or the device's Apps tab.
    The built-in **Clock** installs the same way. A new board starts with no apps.
+
+A board that wasn't flashed from your account (or was removed from it) shows a
+6-digit code: enter it under **Devices → Enter it here**, or open the link the
+board shows.
 
 ### Templates
 
@@ -99,10 +106,10 @@ These are in All apps too, published as **@makerInc**.
 | **Stacker** | any button drops the sliding row |
 | **Hog Invaders** | top / bottom move your ship, middle fires |
 
-Everything except Clock is a Lua script in `server/internal/games` (how to
-write one is in its README). On firmware 3.0 and later, installing one downloads
-it to the board and uninstalling deletes it, and a changed script reaches boards
-as a new version without a firmware update. A game runs in its own Lua state that only
+Everything except Clock is a Lua script in `internal/games` (how to write one is
+in its README). On firmware 3.0 and later, installing one downloads it to the
+board and uninstalling deletes it, and a changed script reaches boards as a new
+version without a firmware update. A game runs in its own Lua state that only
 exists while it's open, with a memory cap and a time limit per frame. In every
 game, holding the middle button for a second goes back to the drawer, and best
 scores are kept on the board. Boards on 2.1–2.3 have the games built in instead.
@@ -116,103 +123,94 @@ the internal memory are.
 
 The board takes at most 15 KB of app content per update (the WebSockets library
 fixes that limit, so the build flag in platformio.ini has no effect). The
-device's Apps tab on the website shows the current size and warns from 80%. Holding **D1** on the WiFi page
-for 6 seconds makes the board forget its WiFi and start the setup hotspot
-(`makerDevice-XXXX`). The same hold works on the status screens shown before the
-board reaches the server.
+device's Apps tab on the website shows the current size and warns from 80%.
+Holding **D1** on the WiFi page for 6 seconds makes the board forget its WiFi and
+start the setup hotspot (`makerDevice-XXXX`). The same hold works on the status
+screens shown before the board reaches the server.
 
 ## Run locally
 
 ```sh
-make            # builds firmware (PlatformIO) + server → bin/esphog
-./bin/esphog    # http://localhost:8080
+make api        # Go server on http://localhost:3000 (API, device routes, built site)
+make web-dev    # Vite on http://localhost:5173, forwarding /api and device routes to :3000
 ```
+
+`make api` serves whatever is in `web/dist`; run `make web` once to build it.
+The database is `data/app.db`. Without `SECRET_KEY` a key is generated and kept
+in the database, which is fine locally.
 
 On localhost the flasher points boards at your computer's LAN IP
-(`ws://192.168.x.x:8080/ws`), so a board on the same WiFi connects to your laptop.
-Browser flashing works on `localhost` and on HTTPS sites only.
-
-## Deploy on Sideyard
-
-espHog runs on [Sideyard](../sideyard.io) as a project named `maker`, at `maker.rabeeta.xyz`.
-
-1. In the Sideyard dashboard, create the project `maker` and set these variables:
-   `PUBLIC_URL=https://maker.rabeeta.xyz`, plus `SECRET_KEY` if you use one, and
-   `TZ` (for example `Asia/Kolkata`) if you want server time in your zone.
-   Leave `ADDR` and `AUTOCERT_DOMAIN` unset: Sideyard sets `PORT` and handles HTTPS.
-2. Put the dashboard's values in `.env.deploy`:
-   ```sh
-   SIDEYARD_URL=https://sideyard.rabeeta.xyz
-   SIDEYARD_PROJECT=maker
-   SIDEYARD_TOKEN=sy_...
-   ```
-3. `make deploy` (add `SIDEYARD_ARCH=arm64` for an ARM server) builds the firmware
-   and a Linux binary, then uploads it.
-
-The database lives in the project's data folder as `data/esphog.db` and survives
-deploys. Boards keep their WebSocket through other projects' deploys; a deploy of
-espHog itself makes them reconnect to the new release.
-
-## Deploy to maker.rabeeta.xyz (without Sideyard)
+(`ws://192.168.x.x:3000/ws`). The server only listens on 127.0.0.1, as Sideyard
+requires, so to let a board on your WiFi reach it, forward that LAN address to
+127.0.0.1:3000. Browser flashing works on `localhost` and on HTTPS sites only.
 
 ```sh
-make linux      # bin/esphog-linux-amd64 and bin/esphog-linux-arm64
-scp bin/esphog-linux-amd64 server:/opt/esphog/esphog
+make test       # every Lua game through the firmware's VM, then go test ./...
+make firmware   # PlatformIO build; copies the result into internal/fw/bin
 ```
 
-**Option A: the binary handles HTTPS itself** (ports 80 and 443 open, DNS pointing at the box):
+The firmware is built on a laptop (PlatformIO) and its `.bin` files are
+committed, so the server and CI embed them without PlatformIO. After changing
+`firmware/`, bump `firmware/version.txt`, run `make firmware` and commit
+`internal/fw/bin`.
+
+## Deploy
+
+Pushing to `master` deploys: the GitHub workflow builds the site and a Linux
+binary, then uploads it to Sideyard, which switches over once `/healthz`
+answers. From a laptop, `make deploy` does the same with the values in
+`.env.deploy`:
 
 ```sh
-AUTOCERT_DOMAIN=maker.rabeeta.xyz SECRET_KEY=$(openssl rand -hex 32) ./esphog
+SIDEYARD_URL=https://sideyard.app.rabeeta.xyz
+SIDEYARD_PROJECT=maker
+SIDEYARD_TOKEN=sy_...
 ```
 
-**Option B: behind Caddy or nginx.** Run it on :8080 with
-`PUBLIC_URL=https://maker.rabeeta.xyz` and proxy to it. The proxy must pass
-WebSocket upgrades on `/ws` and set `X-Forwarded-Proto`. Caddy does both by
-default: `maker.rabeeta.xyz { reverse_proxy localhost:8080 }`.
-
-Example systemd unit (`/etc/systemd/system/esphog.service`):
-
-```ini
-[Unit]
-Description=espHog
-After=network-online.target
-
-[Service]
-WorkingDirectory=/opt/esphog
-ExecStart=/opt/esphog/esphog
-Environment=PUBLIC_URL=https://maker.rabeeta.xyz
-Environment=SECRET_KEY=change-me-to-a-long-random-string
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
+The repository needs the secret `SIDEYARD_TOKEN` and the variables
+`SIDEYARD_URL` and `SIDEYARD_PROJECT` (plus `SIDEYARD_ARCH=arm64` on an ARM
+server). Boards are told to reconnect when a release takes over and land on the
+new one within seconds.
 
 ### Settings
 
+Set these in the project's Variables tab. Sideyard sets `PORT`, `DATA_DIR`,
+`DATABASE_PATH` and `SIDEYARD_*` itself.
+
 | Variable | Default | |
 |---|---|---|
-| `ADDR` | `:8080` | listen address (ignored with `AUTOCERT_DOMAIN`) |
-| `DATABASE_URL` | `data/esphog.db` | or `libsql://<db>-<org>.turso.io?authToken=<token>` for Turso |
-| `PUBLIC_URL` | from the request | the URL boards and browsers use |
-| `SECRET_KEY` | generated, stored in DB | encrypts saved API tokens; set it in production |
+| `PUBLIC_URL` | from the request | the URL boards and browsers use: `https://maker.app.rabeeta.xyz` |
+| `SECRET_KEY` | required on Sideyard | encrypts saved API tokens; keep a copy outside Sideyard, losing it makes them unreadable |
 | `ALLOW_SIGNUP` | `true` | `false` closes registration |
 | `ALLOW_PRIVATE_FETCH` | `false` | let sources and webhooks call LAN/localhost addresses |
-| `AUTOCERT_DOMAIN` | | built-in Let's Encrypt on :443 |
-| `LOG_LEVEL` | `info` | `debug` logs requests |
+| `LOG_LEVEL` | `info` | `debug` logs API requests |
+| `TZ` | the server's | time zone for the clock and `{{ @time }}` |
+
+Boards keep the server URL they were flashed with, so the domain can't change
+without re-flashing them.
 
 ## First flash on a board running CircuitPython
 
 Boards that ship with CircuitPython or UF2 need to be put into the ROM bootloader
 once: **hold D0 (BOOT), tap RESET, release D0**, then click Install. After that,
-espHog's firmware uses the chip's built-in USB serial, so later re-flashes from the
-site reset the board automatically. Updates can also go over WiFi from the device
-page (**Update firmware**).
+the makerDevice firmware uses the chip's built-in USB serial, so later re-flashes
+from the site reset the board automatically. Updates can also go over WiFi from
+the device's Settings tab (**Update**).
 
 ## Layout
 
 ```
+main.go                   config, wiring, graceful shutdown (Sideyard starter)
+db.go                     SQLite and the migrations list (the schema)
+jobs.go, email.go         Sideyard jobs (none yet) and email (unused)
+frontend.go               serves the built React app from web/dist
+internal/engine           device WebSocket hub, poller, push, installed apps → device state
+internal/games            the downloadable Lua games (embedded; served at /games/<id>/<hash>.lua)
+internal/render           templates → device payload, data explorer paths
+internal/store            queries (apps, screens, installs)
+internal/fw               embedded firmware, ESP Web Tools manifest, config image
+internal/web              JSON API, auth, flashing, pairing, device-facing routes
+web/                      React + TypeScript (Vite); ESP Web Tools in public/static/ewt
 firmware/                 PlatformIO project (Arduino, Adafruit GFX/ST7789, ArduinoJson, WebSockets)
   src/main.cpp            state machine: WiFi → server → pairing → Apps drawer, apps, Settings, OTA
   src/display.cpp         the five layouts, clock, drawer, Settings, status/pairing screens, toasts
@@ -224,18 +222,12 @@ firmware/                 PlatformIO project (Arduino, Adafruit GFX/ST7789, Ardu
   src/portal.cpp          fallback "makerDevice-XXXX" hotspot with a WiFi form
   src/config.cpp          NVS + the "hogcfg" partition the flasher writes
   partitions.csv          OTA layout + hogcfg at 0x3D0000
-server/
-  main.go                 config, wiring, HTTP/HTTPS
-  internal/engine         device WebSocket hub, poller, push, installed apps → device state
-  internal/games          the downloadable Lua games (embedded; served at /games/<id>/<hash>.lua)
-  internal/render         templates → device payload, data explorer paths
-  internal/store          SQLite/Turso schema and queries (apps, screens, installs)
-  internal/fw             embedded firmware, ESP Web Tools manifest, config image
-  internal/web            pages (Go templates + htmx), auth, flashing, pairing
 ```
 
 ### Device protocol (JSON over WebSocket)
 
+The board connects to `/ws` with the subprotocol `makerdevice` (firmware before
+3.1.1 sends `esphog`, which is still accepted).
 Device → server: `hello {id, token, code, fw, claim}`.
 Server → device: `state {name, brightness, flip, ox, oy, tz, apps[{id, name, cycle, screens[]}]}`,
 `pair {code}`, `toast {text}`, `ota {url}`, `identify`, `reboot`, `unpaired`,
