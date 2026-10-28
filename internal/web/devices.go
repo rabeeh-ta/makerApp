@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"makerapp/internal/fw"
+	"makerapp/internal/engine"
 	"makerapp/internal/render"
 	"makerapp/internal/store"
 )
@@ -28,7 +28,7 @@ func (s *Server) deviceViews(r *http.Request) ([]deviceView, error) {
 	for _, d := range devices {
 		apps := s.eng.DeviceApps(r.Context(), d, true)
 		v := deviceView{Device: d, Online: s.eng.Online(d.ID), AppCount: len(apps),
-			NeedsUpdate: d.FWVersion != "" && d.FWVersion != fw.Version()}
+			NeedsUpdate: engine.FirmwareOutdated(d.FWVersion)}
 		if len(apps) > 0 && len(apps[0].Screens) > 0 {
 			v.Preview = toWeb(apps[0].Screens[0])
 		}

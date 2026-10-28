@@ -39,6 +39,9 @@ type Engine struct {
 
 	inflightMu sync.Mutex
 	inflight   map[string]bool
+
+	updatesMu sync.Mutex
+	updates   map[string]time.Time // devices asked to update their firmware, and when (see autoUpdate)
 }
 
 type conn struct {
@@ -54,7 +57,7 @@ type conn struct {
 
 func New(st *store.Store, box *secret.Box, fc *fetch.Client, loc *time.Location, log *slog.Logger) *Engine {
 	return &Engine{st: st, box: box, fetch: fc, loc: loc, log: log,
-		conns: map[string]*conn{}, inflight: map[string]bool{}}
+		conns: map[string]*conn{}, inflight: map[string]bool{}, updates: map[string]time.Time{}}
 }
 
 // ---- secrets on sources ----
@@ -104,7 +107,7 @@ func (e *Engine) Send(id string, msg any) bool {
 	}
 	select {
 	case c.send <- b:
-		if m, ok := msg.(map[string]any); ok && m["type"] == "state" {
+		if isState(msg) {
 			c.mu.Lock()
 			c.state = b
 			c.mu.Unlock()
@@ -117,6 +120,36 @@ func (e *Engine) Send(id string, msg any) bool {
 
 func (e *Engine) Toast(id, text string) bool {
 	return e.Send(id, map[string]any{"type": "toast", "text": render.ASCII(text)})
+}
+
+// autoUpdate installs this server's firmware on a board running an older one,
+// right after it connects, so nobody has to press Update. A board whose update
+// fails restarts on its old firmware and reconnects; it's asked again an hour
+// later, not on every reconnect.
+func (e *Engine) autoUpdate(id, have string) {
+	if !FirmwareOutdated(have) {
+		return
+	}
+	e.updatesMu.Lock()
+	if time.Since(e.updates[id]) < time.Hour {
+		e.updatesMu.Unlock()
+		return
+	}
+	e.updates[id] = time.Now()
+	e.updatesMu.Unlock()
+	e.log.Info("updating firmware", "device", id, "from", have, "to", fw.Version())
+	e.OTA(id)
+}
+
+// FirmwareOutdated reports whether a board on this firmware gets this
+// server's firmware the next time it connects.
+func FirmwareOutdated(version string) bool {
+	return fw.Hash() != "none" && !firmwareAtLeast(version, fw.Version())
+}
+
+func isState(msg any) bool {
+	m, ok := msg.(map[string]any)
+	return ok && m["type"] == "state"
 }
 
 // OTA asks the device to download the firmware embedded in this server.
@@ -207,6 +240,9 @@ func (e *Engine) HandleWS(w http.ResponseWriter, r *http.Request) {
 	go e.pingLoop(ctx, cancel, c)
 	for _, m := range reply {
 		e.Send(h.ID, m)
+	}
+	if len(reply) > 0 && isState(reply[0]) {
+		e.autoUpdate(h.ID, h.FW)
 	}
 
 	for {
@@ -598,22 +634,39 @@ func (e *Engine) BuildState(ctx context.Context, deviceID string) (map[string]an
 // instead of apps.
 func legacyFirmware(version string) bool { return !firmwareAtLeast(version, "2.0") }
 
-// firmwareAtLeast compares major.minor versions. Versions that don't parse
-// (development builds) count as new.
+// firmwareAtLeast compares versions part by part (3.1.1 is newer than 3.1.0;
+// a missing part counts as 0). Versions that don't parse (development builds)
+// count as new.
 func firmwareAtLeast(have, want string) bool {
-	parse := func(v string) (int, int, bool) {
-		major, rest, _ := strings.Cut(v, ".")
-		minor, _, _ := strings.Cut(rest, ".")
-		a, err1 := strconv.Atoi(major)
-		b, err2 := strconv.Atoi(minor)
-		return a, b, err1 == nil && (err2 == nil || minor == "")
+	parse := func(v string) ([]int, bool) {
+		var out []int
+		for _, p := range strings.Split(v, ".") {
+			n, err := strconv.Atoi(p)
+			if err != nil {
+				return nil, false
+			}
+			out = append(out, n)
+		}
+		return out, true
 	}
-	ha, hb, ok := parse(have)
+	h, ok := parse(have)
 	if !ok {
 		return true
 	}
-	wa, wb, _ := parse(want)
-	return ha > wa || (ha == wa && hb >= wb)
+	w, _ := parse(want)
+	for i := range max(len(h), len(w)) {
+		var a, b int
+		if i < len(h) {
+			a = h[i]
+		}
+		if i < len(w) {
+			b = w[i]
+		}
+		if a != b {
+			return a > b
+		}
+	}
+	return true
 }
 
 // addLegacyFlow lets a pre-2.0 board step through every installed screen with

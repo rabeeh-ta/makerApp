@@ -123,18 +123,18 @@ function Actions({ data }: { data: DeviceData }) {
         <div className="label-like">Firmware</div>
         <div className="row between fw-row">
           <span>
-            {d.FWVersion} {d.NeedsUpdate ? <span className="badge off">update available</span> : <span className="badge ok">up to date</span>}
+            {d.FWVersion}{' '}
+            {!d.NeedsUpdate ? (
+              <span className="badge ok">up to date</span>
+            ) : (
+              <span className="badge off">{d.Online ? `updating to ${fw}` : `updates to ${fw} when it's online`}</span>
+            )}
           </span>
-          {d.NeedsUpdate ? (
-            <button type="button" className="btn small" onClick={() => act('update', {}, `Install firmware ${fw} over WiFi? The device restarts when done.`)}>
-              Update to {fw}
-            </button>
-          ) : (
-            <button type="button" className="btn ghost small" onClick={() => act('update', {}, `Reinstall firmware ${fw} over WiFi?`)}>
-              Reinstall
-            </button>
-          )}
+          <button type="button" className="btn ghost small" onClick={() => act('update', {}, `Reinstall firmware ${fw} over WiFi? The device restarts when done.`)}>
+            Reinstall
+          </button>
         </div>
+        <p className="muted small">New firmware installs by itself when the board is online, and so do new versions of its apps.</p>
       </div>
 
       <div className="action-group danger-zone">

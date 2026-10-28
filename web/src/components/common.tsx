@@ -90,12 +90,7 @@ export function DeviceHead({ device, tab, paired }: { device: DeviceView; tab: '
           <h1>{device.Name}</h1>
           <p className="muted small">
             <span className="mono">{device.ID}</span> · firmware {device.FWVersion}
-            {device.NeedsUpdate && (
-              <>
-                {' · '}
-                <Link className="accent" to={`/devices/${device.ID}/settings`}>update available</Link>
-              </>
-            )}
+            {device.NeedsUpdate && ' · new firmware installs by itself'}
           </p>
         </div>
         <DeviceBadge key={device.ID} device={device} />

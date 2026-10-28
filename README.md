@@ -227,8 +227,10 @@ without re-flashing them.
 Boards that ship with CircuitPython or UF2 need to be put into the ROM bootloader
 once: **hold D0 (BOOT), tap RESET, release D0**, then click Install. After that,
 the makerDevice firmware uses the chip's built-in USB serial, so later re-flashes
-from the site reset the board automatically. Updates can also go over WiFi from
-the device's Settings tab (**Update**).
+from the site reset the board automatically. After that, updates install by
+themselves over WiFi: a board running older firmware than the server carries is
+told to update as soon as it connects (at most once an hour, so a failed update
+doesn't loop), and new versions of its apps and games download the same way.
 
 ## Layout
 

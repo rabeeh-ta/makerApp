@@ -173,6 +173,10 @@ func TestDeviceFlow(t *testing.T) {
 	if apps := state["apps"].([]any); len(apps) != 0 {
 		t.Fatalf("a new board should have no apps, got %v", apps)
 	}
+	// It runs older firmware than the server has, so it's told to update at once.
+	if ota := recv("ota"); !strings.Contains(ota["url"].(string), "/fw/") {
+		t.Fatalf("ota: %v", ota)
+	}
 	var status struct{ Device *struct{ ID, Name string } }
 	if call("/api/flash/status?claim="+claim.Claim, nil, &status); status.Device == nil || status.Device.Name != "makerDevice EEFF" {
 		t.Fatalf("flash status did not report the device: %+v", status)

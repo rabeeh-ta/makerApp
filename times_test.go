@@ -10,6 +10,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"makerapp/internal/fw"
 	"makerapp/internal/store"
 )
 
@@ -44,7 +45,7 @@ func TestRefreshTimes(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ws.CloseNow()
-	hello, _ := json.Marshal(map[string]any{"type": "hello", "id": board, "token": token, "code": "123456", "fw": "3.1.0"})
+	hello, _ := json.Marshal(map[string]any{"type": "hello", "id": board, "token": token, "code": "123456", "fw": fw.Version()})
 	if err := ws.Write(ctx, websocket.MessageText, hello); err != nil {
 		t.Fatal(err)
 	}

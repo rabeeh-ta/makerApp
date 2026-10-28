@@ -79,7 +79,7 @@ func (s *Server) device(w http.ResponseWriter, r *http.Request) {
 	}
 	data := map[string]any{
 		"Device": deviceView{Device: d, Online: s.eng.Online(d.ID), AppCount: len(installed),
-			NeedsUpdate: d.FWVersion != "" && d.FWVersion != fw.Version()},
+			NeedsUpdate: engine.FirmwareOutdated(d.FWVersion)},
 		"FWVersion": fw.Version(),
 	}
 	size := s.eng.StateSize(r.Context(), d.ID)

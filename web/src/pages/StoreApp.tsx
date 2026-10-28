@@ -73,7 +73,7 @@ export function StoreApp({ id }: { id: string }) {
                 <div className="install-row" key={d.ID}>
                   <span className="grow">
                     <strong>{d.Name}</strong>
-                    {d.NeedsFW && <div className="warn small">Shows up after a firmware update to {d.NeedsFW}.</div>}
+                    {d.NeedsFW && <div className="warn small">Shows up once it updates itself to firmware {d.NeedsFW}.</div>}
                   </span>
                   {d.Installed ? (
                     <PostButton action={`/api/apps/${data.ID}/uninstall`} data={{ device: d.ID, back }} className="btn ghost small">

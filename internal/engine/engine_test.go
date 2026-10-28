@@ -15,6 +15,18 @@ func TestLegacyFirmware(t *testing.T) {
 	}
 }
 
+func TestFirmwareAtLeast(t *testing.T) {
+	for _, c := range []struct {
+		have, want string
+		ok         bool
+	}{{"3.1.1", "3.1.1", true}, {"3.1.0", "3.1.1", false}, {"3.1.2", "3.1.1", true}, {"3.2", "3.1.1", true},
+		{"3.1", "3.1.0", true}, {"2.10", "2.9", true}, {"dev", "3.1.1", true}, {"", "3.1.1", true}} {
+		if got := firmwareAtLeast(c.have, c.want); got != c.ok {
+			t.Errorf("firmwareAtLeast(%q, %q) = %v, want %v", c.have, c.want, got, c.ok)
+		}
+	}
+}
+
 func TestCatalogRunsOn(t *testing.T) {
 	flappy, _ := CatalogEntry("flappy")
 	runner, _ := CatalogEntry("runner")

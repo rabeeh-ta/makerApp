@@ -58,7 +58,7 @@ export function Device({ id }: { id: string }) {
                   <strong>{a.name}</strong>
                   {a.Catalog ? <span className="publisher">@{a.By}</span> : <span className="muted small">{plural(a.screens.length, 'screen')}</span>}
                 </div>
-                {a.NeedsFW && <span className="warn small">Shows up after a firmware update to {a.NeedsFW} (Settings tab).</span>}
+                {a.NeedsFW && <span className="warn small">Shows up once the board updates itself to firmware {a.NeedsFW}.</span>}
               </Link>
               <div className="card-actions">
                 <PostButton action={`/api/devices/${dev.ID}/apps/${a.id}/move`} data={{ dir: 'up' }} className="btn ghost small icon" disabled={a.First} title="Move earlier">

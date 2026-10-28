@@ -81,12 +81,7 @@ export function Devices() {
               </div>
               <div className="muted small">
                 {plural(v.AppCount, 'app')} · firmware {v.FWVersion}
-                {v.NeedsUpdate && (
-                  <>
-                    {' · '}
-                    <span className="accent">update available</span>
-                  </>
-                )}
+                {v.NeedsUpdate && ' · updating'}
               </div>
             </Link>
           ))}
