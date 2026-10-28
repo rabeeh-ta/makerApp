@@ -586,4 +586,5 @@ form.stack > .btn { align-self: flex-end; }
 .store-desc { margin: 6px 0 0; max-width: 60ch; }
 .setup-text { white-space: pre-wrap; word-break: break-word; }
 .stack.tight { gap: 6px; }
+.after-grid { margin: 20px 0 0; }
 .stack.tight p { margin: 0; }

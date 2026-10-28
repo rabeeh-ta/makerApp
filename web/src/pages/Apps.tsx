@@ -59,7 +59,7 @@ export function Apps({ me }: { me: Me }) {
         </div>
       )}
 
-      <p className="muted small section-note">
+      <p className="muted small after-grid">
         Looking for clocks, games and apps other people made? <Link to="/store">Browse the App Store</Link>.
       </p>
     </>
