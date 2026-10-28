@@ -29,7 +29,7 @@ type listing struct {
 
 // featured are the apps the App Store shows first, in order. Any app's ID
 // works, a published one's too.
-var featured = []string{"flappy", "pomodoro", "runner"}
+var featured = []string{"flappy", "pomodoro", "runner", "clock"}
 
 // listings is the App Store, most installed first. Previews show the
 // viewer's own data for personal sources, never the publisher's.

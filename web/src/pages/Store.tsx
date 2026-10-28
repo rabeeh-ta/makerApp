@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Byline, Loading } from '../components/common'
 import { DeviceScreen, Thumb } from '../components/DeviceScreen'
 import { plural, useTitle } from '../lib/format'
-import { Link, useData } from '../lib/router'
+import { Link, useData, useInterval } from '../lib/router'
 import type { Device, Screen } from '../lib/types'
 
 type Listing = {
@@ -23,8 +23,8 @@ const sections: Record<(typeof categories)[number], { title: string; note: strin
   Community: { title: 'From the community', note: 'Apps people built and published. Some show your own data.' },
 }
 
-// Store is the App Store: featured apps, then Games, Tools and the
-// community's apps, with search and category filters. Each app opens its own
+// Store is the App Store: a banner of featured apps, search and category
+// filters, then Games, Tools and the community's apps. Each app opens its own
 // page to install and set it up.
 export function Store() {
   useTitle('App Store')
@@ -39,11 +39,14 @@ export function Store() {
   const featured = (data.Featured ?? []).map((id) => apps.find((a) => a.ID === id)).filter((a): a is Listing => !!a)
   return (
     <>
-      <div className="page-head store-head">
+      <div className="page-head">
         <div>
           <h1>App Store</h1>
           <p className="muted small">Games, tools and apps people made for the makerDevice. Install any of them on your board in a click.</p>
         </div>
+      </div>
+      {featured.length > 0 && <Banner apps={featured} />}
+      <div className="store-filters">
         <label className="store-search">
           <span className="sr-only">Search apps</span>
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -52,20 +55,19 @@ export function Store() {
           </svg>
           <input type="search" placeholder="Search apps" value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
+        <fieldset className="seg chips">
+          <legend className="sr-only">Category</legend>
+          {['All', ...categories].map((c) => (
+            <label key={c}>
+              <input type="radio" name="category" checked={category === c} onChange={() => setCategory(c)} />
+              {c} <span className="count">{inCategory(c).length}</span>
+            </label>
+          ))}
+        </fieldset>
       </div>
-      <fieldset className="seg chips store-chips">
-        <legend className="sr-only">Category</legend>
-        {['All', ...categories].map((c) => (
-          <label key={c}>
-            <input type="radio" name="category" checked={category === c} onChange={() => setCategory(c)} />
-            {c} <span className="count">{inCategory(c).length}</span>
-          </label>
-        ))}
-      </fieldset>
 
       {!q && category === 'All' ? (
         <>
-          {featured.length > 0 && <Featured apps={featured} />}
           {categories.map((c) => {
             const list = inCategory(c)
             return (
@@ -122,35 +124,60 @@ export function Store() {
   )
 }
 
-// Featured is the first featured app, large, with the next two beside it.
-function Featured({ apps }: { apps: Listing[] }) {
-  const [hero, ...rest] = apps
+// Banner slides through the featured apps, one every few seconds; hovering or
+// focusing it holds the slide, and so does asking for reduced motion.
+function Banner({ apps }: { apps: Listing[] }) {
+  const [shown, setShown] = useState(0)
+  const [held, setHeld] = useState(false)
+  const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  const go = (n: number) => setShown((n + apps.length) % apps.length)
+  useInterval(() => go(shown + 1), held || still || apps.length < 2 ? null : 5000)
   return (
-    <section className="store-featured" aria-label="Featured">
-      <Link className="card store-hero" to={`/store/${hero.ID}`}>
-        <div className="store-hero-screen">{hero.Preview && <DeviceScreen s={hero.Preview} />}</div>
-        <div className="stack tight">
-          <span className="eyebrow">Featured</span>
-          <h2>{hero.Name}</h2>
-          <Byline by={hero.By} installs={hero.Installs} />
-          <p className="muted">{hero.Desc}</p>
-          <span className="btn store-get">{hero.On?.length ? 'Installed' : 'Get'}</span>
-        </div>
-      </Link>
-      {rest.length > 0 && (
-        <div className="store-featured-side">
-          {rest.slice(0, 2).map((a) => (
-            <AppCard key={a.ID} a={a} compact />
-          ))}
-        </div>
+    <section
+      className="store-banner"
+      aria-roledescription="carousel"
+      aria-label="Featured apps"
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={() => setHeld(false)}
+    >
+      <div className="store-banner-track" style={{ transform: `translateX(-${shown * 100}%)` }}>
+        {apps.map((a, n) => (
+          <Link key={a.ID} className="store-slide" to={`/store/${a.ID}`} aria-hidden={n !== shown} tabIndex={n === shown ? 0 : -1}>
+            <div className="store-slide-text">
+              <span className="eyebrow">Featured · {a.Category === 'Community' ? 'From the community' : a.Category.replace(/s$/, '')}</span>
+              <h2>{a.Name}</h2>
+              <p>{a.Desc}</p>
+              <Byline by={a.By} installs={a.Installs} />
+              <span className="btn store-get">{a.On?.length ? 'Installed' : 'Get'}</span>
+            </div>
+            <div className="store-slide-screen">{a.Preview && <DeviceScreen s={a.Preview} />}</div>
+          </Link>
+        ))}
+      </div>
+      {apps.length > 1 && (
+        <>
+          <button type="button" className="store-banner-nav prev" aria-label="Previous app" onClick={() => go(shown - 1)}>
+            ‹
+          </button>
+          <button type="button" className="store-banner-nav next" aria-label="Next app" onClick={() => go(shown + 1)}>
+            ›
+          </button>
+          <div className="store-dots">
+            {apps.map((a, n) => (
+              <button key={a.ID} type="button" aria-label={`Show ${a.Name}`} aria-current={n === shown} className={n === shown ? 'on' : undefined} onClick={() => go(n)} />
+            ))}
+          </div>
+        </>
       )}
     </section>
   )
 }
 
-function AppCard({ a, compact }: { a: Listing; compact?: boolean }) {
+function AppCard({ a }: { a: Listing }) {
   return (
-    <Link className={compact ? 'card store-card compact' : 'card store-card'} to={`/store/${a.ID}`}>
+    <Link className="card store-card" to={`/store/${a.ID}`}>
       <Thumb s={a.Preview} empty="No preview" />
       <div className="stack tight">
         <div className="row between">
