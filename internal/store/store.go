@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -332,14 +333,61 @@ func (s *Store) ForgetDevice(ctx context.Context, userID, id string) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM device_apps WHERE device_id = ?`, id); err != nil {
-		return err
+	for _, q := range []string{`DELETE FROM device_apps WHERE device_id = ?`, `DELETE FROM screensavers WHERE device_id = ?`} {
+		if _, err := tx.ExecContext(ctx, q, id); err != nil {
+			return err
+		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE devices SET user_id = NULL, name = '', brightness = 100
 		WHERE id = ? AND user_id = ?`, id, userID); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// ---- screensavers ----
+
+// Screensaver is what a board plays when it sits on its Apps drawer: screens
+// of its installed apps, in order, each shown for IntervalSec.
+type Screensaver struct {
+	IntervalSec int
+	Items       []SaverItem
+}
+
+// SaverItem is one screen in a screensaver: an app's screen, by their IDs
+// (the built-in Clock is app "clock", screen "clock").
+type SaverItem struct {
+	App    string `json:"app"`
+	Screen string `json:"screen"`
+}
+
+// Screensaver is the board's screensaver: none, with a 10-second interval,
+// until one is saved.
+func (s *Store) Screensaver(ctx context.Context, deviceID string) (*Screensaver, error) {
+	sv := &Screensaver{IntervalSec: 10}
+	var items string
+	err := s.db.QueryRowContext(ctx, `SELECT interval_sec, items FROM screensavers WHERE device_id = ?`, deviceID).Scan(&sv.IntervalSec, &items)
+	if errors.Is(err, sql.ErrNoRows) {
+		return sv, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return sv, json.Unmarshal([]byte(items), &sv.Items)
+}
+
+func (s *Store) SaveScreensaver(ctx context.Context, deviceID string, sv *Screensaver) error {
+	if sv.Items == nil {
+		sv.Items = []SaverItem{}
+	}
+	items, err := json.Marshal(sv.Items)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO screensavers (device_id, interval_sec, items) VALUES (?, ?, ?)
+		ON CONFLICT(device_id) DO UPDATE SET interval_sec = excluded.interval_sec, items = excluded.items`,
+		deviceID, sv.IntervalSec, string(items))
+	return err
 }
 
 // ---- sources ----

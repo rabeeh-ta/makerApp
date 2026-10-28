@@ -11,6 +11,7 @@ import { Apps } from './pages/Apps'
 import { Auth } from './pages/Auth'
 import { Connect } from './pages/Connect'
 import { Device } from './pages/Device'
+import { DeviceScreensaver } from './pages/DeviceScreensaver'
 import { DeviceSettings } from './pages/DeviceSettings'
 import { Devices } from './pages/Devices'
 import { Flash } from './pages/Flash'
@@ -34,6 +35,7 @@ const routes: Route[] = [
   { re: /^\/devices$/, page: () => <Devices /> },
   { re: /^\/devices\/([^/]+)$/, page: ([id]) => <Device id={id} /> },
   { re: /^\/devices\/([^/]+)\/settings$/, page: ([id]) => <DeviceSettings id={id} /> },
+  { re: /^\/devices\/([^/]+)\/screensaver$/, page: ([id]) => <DeviceScreensaver key={id} id={id} /> },
   { re: /^\/sources$/, page: () => <Sources /> },
   { re: /^\/sources\/([^/]+)$/, page: ([id]) => <SourceEdit key={id} id={id === 'new' ? '' : id} /> },
   { re: /^\/apps$/, page: (_, me) => <Apps me={me} /> },

@@ -83,6 +83,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/devices/{id}", s.auth(s.saveDevice))
 	mux.HandleFunc("POST /api/devices/{id}/do/{action}", s.auth(s.deviceAction))
 	mux.HandleFunc("POST /api/devices/{id}/apps/{app}/move", s.auth(s.moveDeviceApp))
+	mux.HandleFunc("GET /api/devices/{id}/screensaver", s.auth(s.screensaver))
+	mux.HandleFunc("POST /api/devices/{id}/screensaver", s.auth(s.saveScreensaver))
 
 	// Data sources
 	mux.HandleFunc("GET /api/sources", s.auth(s.sources))

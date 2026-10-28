@@ -628,3 +628,9 @@ a.store-card { gap: 10px; }
   .store-search { flex-basis: 100%; }
   .store-hero-screen .lcd { zoom: 1; margin: 0 auto; }
 }
+/* Screensaver tab */
+.saver-row { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding-top: 12px; border-top: 1px solid var(--line); }
+.saver-row .device-thumb { padding: 8px 0; margin: 0; }
+.saver-row .lcd { zoom: 0.42; }
+.saver-interval { align-items: center; gap: 8px; }
+.saver-interval select { width: auto; }

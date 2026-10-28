@@ -625,10 +625,68 @@ func (e *Engine) BuildState(ctx context.Context, deviceID string) (map[string]an
 	}
 	if legacyFirmware(dev.FWVersion) {
 		addLegacyFlow(state, apps)
-	} else {
-		state["apps"] = apps
+		return state, nil
+	}
+	state["apps"] = apps
+	if saver := e.saverState(ctx, dev.ID, apps); saver != nil {
+		state["saver"] = saver
 	}
 	return state, nil
+}
+
+// SaverRuns reports whether a board on this firmware plays a screensaver.
+func SaverRuns(version string) bool { return firmwareAtLeast(version, "3.2") }
+
+// SaverAfter is how long, in seconds, a board sits untouched on its Apps
+// drawer before the screensaver starts. Any button stops it.
+const SaverAfter = 30
+
+// SaverChoice is a screen a board's screensaver can play.
+type SaverChoice struct {
+	App, AppName string
+	Screen       render.Screen
+}
+
+// SaverChoices are the screens a board's screensaver can play: those of its
+// installed apps, in drawer order, except games and other apps that take the
+// buttons (Pomodoro).
+func SaverChoices(apps []AppView) []SaverChoice {
+	var out []SaverChoice
+	for _, a := range apps {
+		if c, ok := CatalogEntry(a.ID); ok && c.Game {
+			continue
+		}
+		for _, sc := range a.Screens {
+			if sc.Layout != "game" && sc.ID != "empty" {
+				out = append(out, SaverChoice{App: a.ID, AppName: a.Name, Screen: sc})
+			}
+		}
+	}
+	return out
+}
+
+// saverState is the "saver" part of a board's state: its screensaver's
+// screens that are still installed, by reference to the apps it has (firmware
+// 3.2 plays them; older firmware ignores it). nil when there's none.
+func (e *Engine) saverState(ctx context.Context, deviceID string, apps []AppView) map[string]any {
+	sv, err := e.st.Screensaver(ctx, deviceID)
+	if err != nil || len(sv.Items) == 0 {
+		return nil
+	}
+	can := map[store.SaverItem]bool{}
+	for _, c := range SaverChoices(apps) {
+		can[store.SaverItem{App: c.App, Screen: c.Screen.ID}] = true
+	}
+	var items []store.SaverItem
+	for _, it := range sv.Items {
+		if can[it] {
+			items = append(items, it)
+		}
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	return map[string]any{"after": SaverAfter, "interval": sv.IntervalSec, "items": items}
 }
 
 // legacyFirmware reports firmware older than 2.0, which runs a flow of nodes

@@ -26,8 +26,9 @@
 namespace {
 
 enum class Mode { Setup, WifiConnecting, ServerConnecting, Pairing, Ready, Error };
-// What Ready mode shows: the Apps drawer, an open app, or the built-in Settings.
-enum class View { Drawer, App, Settings };
+// What Ready mode shows: the Apps drawer, an open app, the built-in Settings, or
+// the screensaver, which plays after the drawer sits untouched for a while.
+enum class View { Drawer, App, Settings, Saver };
 
 Mode mode = Mode::Setup;
 WebSocketsClient ws;
@@ -50,7 +51,8 @@ int lastMinute = -1;            // clock redraws once a minute
 uint32_t lastLiveDraw = 0;      // screens with device fields redraw periodically
 uint32_t lastSettingsDraw = 0;  // Settings shows live signal strength and memory
 int settingsPage = 0;           // 0 WiFi, 1 Storage
-uint32_t lastCycle = 0;         // last automatic page turn
+uint32_t lastCycle = 0;         // last automatic page turn (in an app, or the screensaver)
+int saverPage = 0;              // page of the screensaver on screen
 int holdLeft = 0;               // seconds of D1 hold left before WiFi reset, shown in Settings
 bool dirty = true;
 
@@ -134,6 +136,23 @@ std::vector<Page> appPages(JsonObjectConst app) {
   for (JsonObjectConst s : app["screens"].as<JsonArrayConst>()) {
     int n = screenPages(s);
     for (int p = 0; p < n; p++) out.push_back({s, p});
+  }
+  return out;
+}
+
+// The screensaver's pages: the screens the server lists under "saver", found
+// in the installed apps, all their pages. Games never play here.
+std::vector<Page> saverPages() {
+  std::vector<Page> out;
+  for (JsonObjectConst item : state["saver"]["items"].as<JsonArrayConst>()) {
+    int i = appIndex(item["app"] | "");
+    if (i < 0) continue;
+    String id = item["screen"] | "";
+    for (JsonObjectConst s : apps()[i]["screens"].as<JsonArrayConst>()) {
+      if (id != (s["id"] | "") || isGameLayout(s["layout"] | "")) continue;
+      int n = screenPages(s);
+      for (int p = 0; p < n; p++) out.push_back({s, p});
+    }
   }
   return out;
 }
@@ -225,6 +244,44 @@ void renderSettings() {
   lastSettingsDraw = millis();
 }
 
+// Draws pages[i]: a clock, a screen with device fields filled in, or any other.
+void drawPage(const std::vector<Page>& pages, int i) {
+  JsonObjectConst screen = pages[i].screen;
+  if (String(screen["layout"] | "") == "clock") {
+    shownClock = true;
+    drawClockNow(screen);
+    return;
+  }
+  JsonDocument filled;
+  if (screen["live"] | false) {
+    // Fill {$device fields} (clock, battery, ...) on a copy before drawing.
+    filled.set(screen);
+    for (const char* k : {"title", "value", "sub", "body"}) {
+      if (filled[k].is<const char*>()) filled[k] = fillDeviceFields(filled[k].as<String>());
+    }
+    for (JsonArray row : filled["items"].as<JsonArray>()) {
+      row[0] = fillDeviceFields(row[0].as<String>());
+      row[1] = fillDeviceFields(row[1].as<String>());
+    }
+    screen = filled.as<JsonObjectConst>();
+    shownLive = true;
+    lastLiveDraw = millis();
+  }
+  drawScreen(screen, pages[i].part, i, pages.size());
+}
+
+void renderSaver() {
+  std::vector<Page> pages = saverPages();
+  if (pages.empty()) {  // its screens aren't installed: try again after another idle spell
+    view = View::Drawer;
+    lastInteraction = millis();
+    renderDrawer();
+    return;
+  }
+  saverPage %= pages.size();
+  drawPage(pages, saverPage);
+}
+
 void renderApp(JsonObjectConst app) {
   std::vector<Page> pages = appPages(app);
   if (pages.empty()) {
@@ -245,27 +302,7 @@ void renderApp(JsonObjectConst app) {
     gameDraw();
     return;
   }
-  if (layout == "clock") {
-    shownClock = true;
-    drawClockNow(screen);
-    return;
-  }
-  JsonDocument filled;
-  if (screen["live"] | false) {
-    // Fill {$device fields} (clock, battery, ...) on a copy before drawing.
-    filled.set(screen);
-    for (const char* k : {"title", "value", "sub", "body"}) {
-      if (filled[k].is<const char*>()) filled[k] = fillDeviceFields(filled[k].as<String>());
-    }
-    for (JsonArray row : filled["items"].as<JsonArray>()) {
-      row[0] = fillDeviceFields(row[0].as<String>());
-      row[1] = fillDeviceFields(row[1].as<String>());
-    }
-    screen = filled.as<JsonObjectConst>();
-    shownLive = true;
-    lastLiveDraw = millis();
-  }
-  drawScreen(screen, pages[page].part, page, pages.size());
+  drawPage(pages, page);
 }
 
 void render() {
@@ -299,6 +336,8 @@ void render() {
     case Mode::Ready:
       if (view == View::Settings) {
         renderSettings();
+      } else if (view == View::Saver) {
+        renderSaver();
       } else if (view == View::App && !currentApp().isNull()) {
         renderApp(currentApp());
       } else {
@@ -566,7 +605,9 @@ void syncGames() {
 void onButton(int i) {
   lastInteraction = millis();
   if (mode != Mode::Ready) return;
-  if (view == View::Drawer) {
+  if (view == View::Saver) {
+    view = View::Drawer;
+  } else if (view == View::Drawer) {
     int n = appCount() + 1;  // the apps, then Settings
     drawerSel = constrain(drawerSel, 0, n - 1);
     if (i == 0)
@@ -651,6 +692,17 @@ void pollButtons() {
 void tick() {
   if (mode != Mode::Ready) return;
   uint32_t now = millis();
+  JsonObjectConst saver = state["saver"].as<JsonObjectConst>();
+  if (view == View::Drawer && !saver.isNull() && now - lastInteraction > (uint32_t)(saver["after"] | 30) * 1000) {
+    view = View::Saver;
+    saverPage = 0;
+    lastCycle = now;
+    dirty = true;
+  } else if (view == View::Saver && now - lastCycle > (uint32_t)max(3, saver["interval"] | 10) * 1000) {
+    saverPage++;  // renderSaver wraps it
+    lastCycle = now;
+    dirty = true;
+  }
   if (view == View::App) {
     JsonObjectConst app = currentApp();
     uint32_t cycle = (uint32_t)(app["cycle"] | 0) * 1000;

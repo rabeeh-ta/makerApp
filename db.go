@@ -176,6 +176,13 @@ var migrations = []string{
 	// A personal source's example data: what previews on the website show
 	// someone who hasn't sent their own yet. Boards only ever show real data.
 	`ALTER TABLE sources ADD COLUMN example TEXT NOT NULL DEFAULT ''`,
+	// What a board plays when it sits on its Apps drawer: screens of its
+	// installed apps (a JSON list of {"app", "screen"}), each for interval_sec.
+	`CREATE TABLE screensavers (
+		device_id TEXT PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+		interval_sec INTEGER NOT NULL DEFAULT 10,
+		items TEXT NOT NULL DEFAULT '[]'
+	)`,
 }
 
 func migrate(db *sql.DB) error {

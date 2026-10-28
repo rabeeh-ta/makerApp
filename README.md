@@ -98,6 +98,11 @@ and texts are split into pages of five rows, and the dots in the corner show
 where you are. An app can also turn its pages by itself (**Cycle screens**).
 Data refreshes on each source's interval; there are no per-button actions.
 
+**Screensaver** (firmware 3.2): when the board sits on the drawer for 30
+seconds, it plays the screens chosen on the device's **Screensaver** tab, in
+order, each for the chosen time, until any button is pressed. Any installed
+app's screens can be in it, the Clock too; games can't, they need the buttons.
+
 ### Publishing
 
 On an app's page, **Publish…** opens the publish flow: the store listing (name,

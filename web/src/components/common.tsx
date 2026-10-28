@@ -79,7 +79,7 @@ export function MyAppsHead({ tab, intro, actions }: { tab: 'apps' | 'sources'; i
 }
 
 // DeviceHead is the title and tabs of a device's pages.
-export function DeviceHead({ device, tab, paired }: { device: DeviceView; tab: 'apps' | 'settings'; paired?: boolean }) {
+export function DeviceHead({ device, tab, paired }: { device: DeviceView; tab: 'screensaver' | 'apps' | 'settings'; paired?: boolean }) {
   return (
     <>
       <div className="page-head device-head">
@@ -96,6 +96,9 @@ export function DeviceHead({ device, tab, paired }: { device: DeviceView; tab: '
         <DeviceBadge key={device.ID} device={device} />
       </div>
       <nav className="tabs-nav">
+        <Link to={`/devices/${device.ID}/screensaver`} className={tab === 'screensaver' ? 'on' : undefined}>
+          Screensaver
+        </Link>
         <Link to={`/devices/${device.ID}`} className={tab === 'apps' ? 'on' : undefined}>
           Apps <span className="count">{device.AppCount}</span>
         </Link>
