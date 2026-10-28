@@ -87,7 +87,7 @@ function draw()
   if state == "ready" then
     card("Stacker", "Press to drop the row", "Hold middle to leave")
   elseif state == "over" then
-    card(won and "Top reached!" or "Missed", "Rows " .. #rows .. "   Best " .. top, "Middle: play again")
+    card(won and "Top reached!" or "Missed", "Rows " .. #rows .. "   Best " .. top, "Middle: play again", "Hold middle to leave")
   end
 end
 

@@ -120,9 +120,9 @@ function draw()
   if state == "title" then
     card("Breakout", "Top / bottom: move", "Middle: launch", "Hold middle to leave")
   elseif state == "paused" then
-    card("Paused", "Middle: resume")
+    card("Paused", "Middle: resume", "Hold middle to leave")
   elseif state == "over" then
-    card("Game over", "Score " .. score .. "   Best " .. top, "Middle: play again")
+    card("Game over", "Score " .. score .. "   Best " .. top, "Middle: play again", "Hold middle to leave")
   end
 end
 

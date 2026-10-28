@@ -68,7 +68,7 @@ function draw()
   if state == "ready" then
     card("Whack-a-Hog", "Press the hog's row", "Middle: start", "Hold middle to leave")
   elseif state == "over" then
-    card("Time's up", "Score " .. score .. "   Best " .. top, "Middle: play again")
+    card("Time's up", "Score " .. score .. "   Best " .. top, "Middle: play again", "Hold middle to leave")
   end
 end
 

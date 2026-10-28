@@ -56,7 +56,7 @@ function draw()
   if state == "ready" then
     card("Simon", "Watch, then repeat", "Middle: start", "Hold middle to leave")
   elseif state == "over" then
-    card("Wrong pad", "Rounds " .. (#seq - 1) .. "   Best " .. top, "Middle: play again")
+    card("Wrong pad", "Rounds " .. (#seq - 1) .. "   Best " .. top, "Middle: play again", "Hold middle to leave")
   end
 end
 

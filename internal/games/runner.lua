@@ -135,7 +135,7 @@ function draw()
   if state == "ready" then
     card("Hog Runner", "Middle: jump", "Bottom: duck", "Hold middle to leave")
   elseif state == "over" then
-    card("Game over", "Score " .. score() .. "   Best " .. top, "Middle: run again")
+    card("Game over", "Score " .. score() .. "   Best " .. top, "Middle: run again", "Hold middle to leave")
   end
 end
 

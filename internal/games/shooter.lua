@@ -165,7 +165,7 @@ function draw()
   if state == "ready" then
     card("Hog Invaders", "Top / bottom: move", "Middle: fire", "Hold middle to leave")
   elseif state == "over" then
-    card("Game over", "Score " .. score .. "   Best " .. top, "Middle: play again")
+    card("Game over", "Score " .. score .. "   Best " .. top, "Middle: play again", "Hold middle to leave")
   end
 end
 

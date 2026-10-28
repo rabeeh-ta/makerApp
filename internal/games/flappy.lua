@@ -80,6 +80,7 @@ function draw()
     shadow(60, "Game over", LARGE, WHITE)
     shadow(84, "Score " .. score .. "   Best " .. top, BOLD, WHITE)
     shadow(106, "Press to play again", SMALL, WHITE)
+    shadow(124, "Hold middle to leave", SMALL, WHITE)
   end
 end
 

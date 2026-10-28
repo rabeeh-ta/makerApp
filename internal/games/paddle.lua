@@ -96,9 +96,11 @@ function draw()
   elseif state == "paused" then
     shadow(70, "PAUSED", LARGE, HOG)
     shadow(92, "Middle: resume", SMALL, WHITE)
+    shadow(110, "Hold middle to leave", SMALL, WHITE)
   elseif state == "over" then
     shadow(64, verdict, BOLD, HOG)
     shadow(88, "Middle: play again", SMALL, WHITE)
+    shadow(106, "Hold middle to leave", SMALL, WHITE)
   end
 end
 
