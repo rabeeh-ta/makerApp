@@ -5,6 +5,7 @@ import { get, whenSignedOut } from './lib/api'
 import { useTitle } from './lib/format'
 import { Link, navigate, useLocation } from './lib/router'
 import type { Me } from './lib/types'
+import { Account } from './pages/Account'
 import { AppPage } from './pages/App'
 import { Apps } from './pages/Apps'
 import { Auth } from './pages/Auth'
@@ -36,6 +37,7 @@ const routes: Route[] = [
   { re: /^\/apps\/([^/]+)$/, page: ([id]) => <AppPage id={id} /> },
   { re: /^\/screens\/([^/]+)$/, page: ([id]) => <ScreenEdit key={id} id={id === 'new' ? '' : id} /> },
   { re: /^\/connect$/, page: () => <Connect /> },
+  { re: /^\/account$/, page: () => <Account /> },
   { re: /^\/oauth\/authorize$/, page: () => <OAuthAuthorize /> },
 ]
 

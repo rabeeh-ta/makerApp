@@ -303,6 +303,8 @@ h3 { font-weight: 600; letter-spacing: -0.01em; }
 .topbar nav a.on { color: var(--ink); background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
 .avatar { width: 28px; height: 28px; border-radius: 50%; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--accent) 18%, var(--panel)); color: var(--accent); font-weight: 700; font-size: 13px; text-transform: uppercase; }
 .who { gap: 14px; }
+a.avatar { text-decoration: none; transition: box-shadow 0.15s; }
+a.avatar:hover, a.avatar.on { box-shadow: 0 0 0 2px var(--accent); }
 
 /* Cards */
 .card { border-radius: var(--radius); box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent); }
@@ -400,6 +402,12 @@ a.card:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
 .lcd-art .art-hint { left: 0; right: 0; top: 114px; text-align: center; font-size: 11px; color: #8c8a85; }
 .data-size { margin-top: 12px; }
 .section-title { margin: 28px 0 12px; }
+/* Account page */
+.kv { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 12px 20px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.grid.stats { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.stat-num { font-size: 28px; font-weight: 700; line-height: 1.1; }
 .install-list { padding: 4px 16px; }
 .install-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
 .install-list .install-row:first-child { border-top: 0; }

@@ -167,6 +167,23 @@ func (s *Store) DeleteSession(ctx context.Context, token string) error {
 	return err
 }
 
+// SetPassword changes the password and signs out every other session, keeping
+// the one that made the change.
+func (s *Store) SetPassword(ctx context.Context, userID, passwordHash, keepSession string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET password_hash = ? WHERE id = ?`, passwordHash, userID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND token_hash != ?`, userID, HashToken(keepSession)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // ---- claims: one-time tokens written into firmware flashed from the site ----
 
 func (s *Store) CreateClaim(ctx context.Context, userID string, ttl time.Duration) (string, error) {

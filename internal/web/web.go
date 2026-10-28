@@ -66,6 +66,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/login", s.login)
 	mux.HandleFunc("POST /api/signup", s.signup)
 	mux.HandleFunc("POST /api/logout", s.logout)
+	mux.HandleFunc("GET /api/account", s.auth(s.account))
+	mux.HandleFunc("POST /api/account/password", s.auth(s.changePassword))
 
 	// Flashing and pairing
 	mux.HandleFunc("GET /api/flash", s.auth(s.flashInfo))

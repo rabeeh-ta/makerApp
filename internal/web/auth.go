@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -103,6 +104,63 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 		next = "/flash"
 	}
 	redirect(w, safeNext(next))
+}
+
+// account is the profile page: who's signed in and what the account holds.
+func (s *Server) account(w http.ResponseWriter, r *http.Request) {
+	u := currentUser(r)
+	ctx := r.Context()
+	devices, err1 := s.st.UserDevices(ctx, u.ID)
+	apps, err2 := s.st.UserApps(ctx, u.ID)
+	sources, err3 := s.st.UserSources(ctx, u.ID)
+	grants, err4 := s.st.UserGrants(ctx, u.ID)
+	if notFound(w, errors.Join(err1, err2, err3, err4)) {
+		return
+	}
+	online := 0
+	for _, d := range devices {
+		if s.eng.Online(d.ID) {
+			online++
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"Email": u.Email, "Username": u.Username, "CreatedAt": u.CreatedAt,
+		"Devices": len(devices), "Online": online, "Apps": len(apps), "Sources": len(sources), "AIApps": len(grants),
+	})
+}
+
+// changePassword needs the current password, and signs out everywhere else.
+// A wrong one answers 400, not 401: the website reads 401 as signed out.
+func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
+	u := currentUser(r)
+	password := r.FormValue("password")
+	if !s.lim.Allow("password:"+u.ID, 10, time.Minute) {
+		fail(w, http.StatusTooManyRequests, "Too many attempts. Wait a minute and try again.")
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(r.FormValue("current"))) != nil {
+		fail(w, http.StatusBadRequest, "Your current password is wrong.")
+		return
+	}
+	if len(password) < 8 {
+		fail(w, http.StatusBadRequest, "Use at least 8 characters for the new password.")
+		return
+	}
+	if password != r.FormValue("confirm") {
+		fail(w, http.StatusBadRequest, "The new passwords don't match.")
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		fail(w, http.StatusInternalServerError, "Could not change the password.")
+		return
+	}
+	c, _ := r.Cookie(sessionCookie) // auth found it
+	if err := s.st.SetPassword(r.Context(), u.ID, string(hash), c.Value); err != nil {
+		fail(w, http.StatusInternalServerError, "Could not change the password.")
+		return
+	}
+	redirect(w, "/account?changed")
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {

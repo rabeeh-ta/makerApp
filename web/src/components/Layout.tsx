@@ -26,7 +26,9 @@ export function Layout({ me, path, onSignOut, children }: { me: Me; path: string
                 <Link to="/connect" className={on('/connect')}>AI Builder</Link>
               </nav>
               <div className="who">
-                <span className="avatar" title={me.User.Email}>{me.User.Email.slice(0, 1)}</span>
+                <Link to="/account" className={['avatar', on('/account')].filter(Boolean).join(' ')} title={`${me.User.Email} · Account`} aria-label="Account">
+                  {me.User.Email.slice(0, 1)}
+                </Link>
                 <button type="button" className="link" onClick={logout}>Log out</button>
               </div>
             </>
