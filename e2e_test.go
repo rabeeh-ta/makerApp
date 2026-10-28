@@ -281,20 +281,24 @@ func TestDeviceFlow(t *testing.T) {
 		t.Fatalf("after uninstall: %v", got)
 	}
 	type appsPage struct {
-		Apps   []struct{ Name string }
-		Public []struct {
+		Apps []struct{ Name string }
+	}
+	type storePage struct {
+		Apps []struct {
 			ID, Name, Desc, By string
 			Installs           int
 		}
 	}
 	var ap appsPage
+	var sp storePage
 	call("/api/apps", nil, &ap)
+	call("/api/store", nil, &sp)
 	hasGame := false
-	for _, l := range ap.Public {
+	for _, l := range sp.Apps {
 		hasGame = hasGame || l.Name == "Hog Invaders"
 	}
 	if len(ap.Apps) != 1 || ap.Apps[0].Name != "Ops" || !hasGame {
-		t.Fatalf("library should list the uninstalled app and the built-in games: %+v", ap)
+		t.Fatalf("my apps should list the uninstalled app, the App Store the built-in games: %+v %+v", ap, sp)
 	}
 
 	// Publishing: pick a public name once, then the app is in everyone's list
@@ -304,14 +308,14 @@ func TestDeviceFlow(t *testing.T) {
 		t.Fatalf("a too-short public name should be refused: %d %+v", code, pubErr)
 	}
 	post("/api/apps/"+appID+"/publish", url.Values{"username": {"Tester"}, "description": {"Deploys today"}})
-	ap = appsPage{}
-	call("/api/apps", nil, &ap)
+	sp = storePage{}
+	call("/api/store", nil, &sp)
 	published := false
-	for _, l := range ap.Public {
+	for _, l := range sp.Apps {
 		published = published || (l.ID == appID && l.By == "tester" && l.Desc == "Deploys today" && l.Installs == 1)
 	}
 	if !published {
-		t.Fatalf("published app missing from All apps, or without its publisher and installs: %+v", ap.Public)
+		t.Fatalf("published app missing from the App Store, or without its publisher and installs: %+v", sp.Apps)
 	}
 	if u := mustUser(t, st); u.Username != "tester" {
 		t.Fatalf("username %q", u.Username)

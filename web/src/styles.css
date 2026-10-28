@@ -581,3 +581,9 @@ form.stack > .btn { align-self: flex-end; }
 .consent ul { margin: 0 0 16px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 .consent-actions { justify-content: flex-end; margin-top: 8px; }
 .connect-lead { margin: 6px 0 0; max-width: 720px; }
+
+/* ===== App Store ===== */
+.store-desc { margin: 6px 0 0; max-width: 60ch; }
+.setup-text { white-space: pre-wrap; word-break: break-word; }
+.stack.tight { gap: 6px; }
+.stack.tight p { margin: 0; }

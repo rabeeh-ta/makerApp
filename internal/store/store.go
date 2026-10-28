@@ -360,18 +360,29 @@ type Source struct {
 	LastError     string
 	LastFetchedAt int64
 	CreatedAt     int64
+	PerUser       bool   // personal: everyone who installs an app using it sends their own data, to a copy of it
+	OriginID      string // set on such a copy: the source it copies
+	Example       string // personal: JSON website previews show people who haven't sent their own
 }
 
-const sourceCols = `id, user_id, name, kind, method, url, secret, body, interval_sec, push_token, last_data, last_status, last_error, last_fetched_at, created_at`
+const sourceCols = `id, user_id, name, kind, method, url, secret, body, interval_sec, push_token, last_data, last_status, last_error, last_fetched_at, created_at, per_user, origin_id, example`
 
 const sourceSelect = `id, user_id, name, kind, method, url, secret, body, interval_sec, push_token, last_data, last_status, last_error,
-	COALESCE(unixepoch(last_fetched_at), 0), unixepoch(created_at)`
+	COALESCE(unixepoch(last_fetched_at), 0), unixepoch(created_at), per_user, COALESCE(origin_id, ''), example`
 
 func scanSource(row interface{ Scan(...any) error }) (*Source, error) {
 	x := &Source{}
 	err := row.Scan(&x.ID, &x.UserID, &x.Name, &x.Kind, &x.Method, &x.URL, &x.Secret, &x.Body, &x.IntervalSec,
-		&x.PushToken, &x.LastData, &x.LastStatus, &x.LastError, &x.LastFetchedAt, &x.CreatedAt)
+		&x.PushToken, &x.LastData, &x.LastStatus, &x.LastError, &x.LastFetchedAt, &x.CreatedAt, &x.PerUser, &x.OriginID, &x.Example)
 	return x, notFound(err)
+}
+
+// orNull stores "" as NULL, for optional references.
+func orNull(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 func (s *Store) querySources(ctx context.Context, q string, args ...any) ([]*Source, error) {
@@ -395,16 +406,40 @@ func (s *Store) Source(ctx context.Context, id string) (*Source, error) {
 	return scanSource(s.db.QueryRowContext(ctx, `SELECT `+sourceSelect+` FROM sources WHERE id = ?`, id))
 }
 
+// UserSource is one of the sources the user made. Copies of personal sources
+// aren't among them: those belong to the apps they were installed with.
 func (s *Store) UserSource(ctx context.Context, userID, id string) (*Source, error) {
-	return scanSource(s.db.QueryRowContext(ctx, `SELECT `+sourceSelect+` FROM sources WHERE id = ? AND user_id = ?`, id, userID))
+	return scanSource(s.db.QueryRowContext(ctx, `SELECT `+sourceSelect+` FROM sources WHERE id = ? AND user_id = ? AND origin_id IS NULL`, id, userID))
 }
 
 func (s *Store) SourceByPushToken(ctx context.Context, token string) (*Source, error) {
 	return scanSource(s.db.QueryRowContext(ctx, `SELECT `+sourceSelect+` FROM sources WHERE push_token = ? AND kind = 'push'`, token))
 }
 
+// UserSources lists the sources the user made (not copies, see UserSource).
 func (s *Store) UserSources(ctx context.Context, userID string) ([]*Source, error) {
-	return s.querySources(ctx, `SELECT `+sourceSelect+` FROM sources WHERE user_id = ? ORDER BY name`, userID)
+	return s.querySources(ctx, `SELECT `+sourceSelect+` FROM sources WHERE user_id = ? AND origin_id IS NULL ORDER BY name`, userID)
+}
+
+// SourceCopy is the user's own copy of a personal source.
+func (s *Store) SourceCopy(ctx context.Context, originID, userID string) (*Source, error) {
+	return scanSource(s.db.QueryRowContext(ctx, `SELECT `+sourceSelect+` FROM sources WHERE origin_id = ? AND user_id = ?`, originID, userID))
+}
+
+// EnsureSourceCopy gives the user their own copy of a personal source, with
+// its own push link, unless they have one already.
+func (s *Store) EnsureSourceCopy(ctx context.Context, origin *Source, userID string) (*Source, error) {
+	if _, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO sources (id, user_id, name, kind, push_token, origin_id, created_at)
+		VALUES (?, ?, ?, 'push', ?, ?, ?)`, NewID(), userID, origin.Name, RandomToken(16), origin.ID, iso(now())); err != nil {
+		return nil, err
+	}
+	return s.SourceCopy(ctx, origin.ID, userID)
+}
+
+// PersonalSources lists the personal sources an app's screens use.
+func (s *Store) PersonalSources(ctx context.Context, appID string) ([]*Source, error) {
+	return s.querySources(ctx, `SELECT `+sourceSelect+` FROM sources
+		WHERE per_user = 1 AND id IN (SELECT source_id FROM screens WHERE app_id = ?) ORDER BY name`, appID)
 }
 
 // DueSources lists HTTP sources whose interval has elapsed.
@@ -417,16 +452,16 @@ func (s *Store) SaveSource(ctx context.Context, x *Source) error {
 	if x.ID == "" {
 		x.ID = NewID()
 		x.CreatedAt = now()
-		_, err := s.db.ExecContext(ctx, `INSERT INTO sources (`+sourceCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		_, err := s.db.ExecContext(ctx, `INSERT INTO sources (`+sourceCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			x.ID, x.UserID, x.Name, x.Kind, x.Method, x.URL, x.Secret, x.Body, x.IntervalSec, x.PushToken,
-			x.LastData, x.LastStatus, x.LastError, iso(x.LastFetchedAt), iso(x.CreatedAt))
+			x.LastData, x.LastStatus, x.LastError, iso(x.LastFetchedAt), iso(x.CreatedAt), x.PerUser, orNull(x.OriginID), x.Example)
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE sources SET name = ?, kind = ?, method = ?, url = ?, secret = ?, body = ?,
-		interval_sec = ?, push_token = ?, last_data = ?, last_status = ?, last_error = ?, last_fetched_at = ?
+		interval_sec = ?, push_token = ?, last_data = ?, last_status = ?, last_error = ?, last_fetched_at = ?, per_user = ?, example = ?
 		WHERE id = ? AND user_id = ?`,
 		x.Name, x.Kind, x.Method, x.URL, x.Secret, x.Body, x.IntervalSec, x.PushToken, x.LastData, x.LastStatus,
-		x.LastError, iso(x.LastFetchedAt), x.ID, x.UserID)
+		x.LastError, iso(x.LastFetchedAt), x.PerUser, x.Example, x.ID, x.UserID)
 	return err
 }
 
@@ -588,19 +623,25 @@ type App struct {
 	CycleSec    int // move to the next screen after this long without a press; 0 = off
 	UpdatedAt   int64
 	CreatedAt   int64
-	Description string // shown in the public list
+	Description string // shown in the App Store
 	PublishedAt int64  // 0 unless anyone can install it
 	MadeBy      string // the AI client that made it over MCP ("Claude"); "" if made on the website
+	Setup       string // how to set it up, shown on its App Store page
 }
 
-const appCols = `id, user_id, name, cycle_sec, updated_at, created_at, description, published_at, made_by`
+const appCols = `id, user_id, name, cycle_sec, updated_at, created_at, description, published_at, made_by, setup`
 
 const appSelect = `a.id, a.user_id, a.name, a.cycle_sec, unixepoch(a.updated_at), unixepoch(a.created_at), a.description,
-	COALESCE(unixepoch(a.published_at), 0), a.made_by`
+	COALESCE(unixepoch(a.published_at), 0), a.made_by, a.setup`
+
+// appDest is where a row selected with appSelect scans to.
+func appDest(a *App) []any {
+	return []any{&a.ID, &a.UserID, &a.Name, &a.CycleSec, &a.UpdatedAt, &a.CreatedAt, &a.Description, &a.PublishedAt, &a.MadeBy, &a.Setup}
+}
 
 func scanApp(row interface{ Scan(...any) error }) (*App, error) {
 	a := &App{}
-	err := row.Scan(&a.ID, &a.UserID, &a.Name, &a.CycleSec, &a.UpdatedAt, &a.CreatedAt, &a.Description, &a.PublishedAt, &a.MadeBy)
+	err := row.Scan(appDest(a)...)
 	return a, notFound(err)
 }
 
@@ -630,12 +671,12 @@ func (s *Store) SaveApp(ctx context.Context, a *App) error {
 	if a.ID == "" {
 		a.ID = NewID()
 		a.CreatedAt = a.UpdatedAt
-		_, err := s.db.ExecContext(ctx, `INSERT INTO apps (`+appCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			a.ID, a.UserID, a.Name, a.CycleSec, iso(a.UpdatedAt), iso(a.CreatedAt), a.Description, iso(a.PublishedAt), a.MadeBy)
+		_, err := s.db.ExecContext(ctx, `INSERT INTO apps (`+appCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			a.ID, a.UserID, a.Name, a.CycleSec, iso(a.UpdatedAt), iso(a.CreatedAt), a.Description, iso(a.PublishedAt), a.MadeBy, a.Setup)
 		return err
 	}
-	_, err := s.db.ExecContext(ctx, `UPDATE apps SET name = ?, cycle_sec = ?, updated_at = ?, description = ?, published_at = ?
-		WHERE id = ? AND user_id = ?`, a.Name, a.CycleSec, iso(a.UpdatedAt), a.Description, iso(a.PublishedAt), a.ID, a.UserID)
+	_, err := s.db.ExecContext(ctx, `UPDATE apps SET name = ?, cycle_sec = ?, updated_at = ?, description = ?, published_at = ?, setup = ?
+		WHERE id = ? AND user_id = ?`, a.Name, a.CycleSec, iso(a.UpdatedAt), a.Description, iso(a.PublishedAt), a.Setup, a.ID, a.UserID)
 	return err
 }
 
@@ -680,8 +721,7 @@ func (s *Store) PublishedApps(ctx context.Context) ([]PublishedApp, error) {
 	var out []PublishedApp
 	for rows.Next() {
 		p := PublishedApp{App: &App{}}
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.CycleSec, &p.UpdatedAt, &p.CreatedAt, &p.Description,
-			&p.PublishedAt, &p.MadeBy, &p.Publisher); err != nil {
+		if err := rows.Scan(append(appDest(p.App), &p.Publisher)...); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -695,7 +735,7 @@ func (s *Store) InstallableApp(ctx context.Context, userID, id string) (a *App, 
 	a = &App{}
 	err = s.db.QueryRowContext(ctx, `SELECT `+appSelect+`, CASE WHEN a.user_id = ? THEN '' ELSE COALESCE(u.username, '') END
 		FROM apps a JOIN users u ON u.id = a.user_id WHERE a.id = ? AND (a.user_id = ? OR a.published_at IS NOT NULL)`, userID, id, userID).
-		Scan(&a.ID, &a.UserID, &a.Name, &a.CycleSec, &a.UpdatedAt, &a.CreatedAt, &a.Description, &a.PublishedAt, &a.MadeBy, &publisher)
+		Scan(append(appDest(a), &publisher)...)
 	return a, publisher, notFound(err)
 }
 
@@ -795,13 +835,24 @@ func (s *Store) DevicesWithApp(ctx context.Context, appID string) ([]string, err
 
 // DevicesForScreens lists devices with an app installed that contains any of the given screens.
 func (s *Store) DevicesForScreens(ctx context.Context, screenIDs []string) ([]string, error) {
+	return s.devicesForScreens(ctx, "", screenIDs)
+}
+
+// UserDevicesForScreens is DevicesForScreens for one user's devices.
+func (s *Store) UserDevicesForScreens(ctx context.Context, userID string, screenIDs []string) ([]string, error) {
+	return s.devicesForScreens(ctx, userID, screenIDs)
+}
+
+// devicesForScreens is DevicesForScreens, for every user's devices when userID is "".
+func (s *Store) devicesForScreens(ctx context.Context, userID string, screenIDs []string) ([]string, error) {
 	if len(screenIDs) == 0 {
 		return nil, nil
 	}
-	args := make([]any, len(screenIDs))
-	for i, id := range screenIDs {
-		args[i] = id
+	args := []any{userID, userID}
+	for _, id := range screenIDs {
+		args = append(args, id)
 	}
 	return s.queryIDs(ctx, `SELECT DISTINCT da.device_id FROM device_apps da JOIN screens s ON s.app_id = da.app_id
-		WHERE s.id IN (?`+strings.Repeat(",?", len(screenIDs)-1)+`)`, args...)
+		JOIN devices d ON d.id = da.device_id WHERE (? = '' OR d.user_id = ?)
+		AND s.id IN (?`+strings.Repeat(",?", len(screenIDs)-1)+`)`, args...)
 }

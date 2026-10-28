@@ -54,6 +54,30 @@ function DeviceBadge({ device }: { device: DeviceView }) {
   return <span className={st.Online ? 'badge ok' : 'badge off'}>{st.Online ? 'Online' : `Offline · seen ${ago(st.LastSeen)}`}</span>
 }
 
+// MyAppsHead is the title and tabs of My apps: the apps you made, and the
+// data sources that feed them.
+export function MyAppsHead({ tab, intro, actions }: { tab: 'apps' | 'sources'; intro: string; actions: React.ReactNode }) {
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h1>My apps</h1>
+          <p className="muted small">{intro}</p>
+        </div>
+        <div className="row">{actions}</div>
+      </div>
+      <nav className="tabs-nav">
+        <Link to="/apps" className={tab === 'apps' ? 'on' : undefined}>
+          Apps
+        </Link>
+        <Link to="/sources" className={tab === 'sources' ? 'on' : undefined}>
+          Data sources
+        </Link>
+      </nav>
+    </>
+  )
+}
+
 // DeviceHead is the title and tabs of a device's pages.
 export function DeviceHead({ device, tab, paired }: { device: DeviceView; tab: 'apps' | 'settings'; paired?: boolean }) {
   return (

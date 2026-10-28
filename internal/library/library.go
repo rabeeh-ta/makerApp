@@ -52,6 +52,8 @@ type SourceInput struct {
 	Body        string
 	IntervalSec int    // 0 means the default, 5 minutes
 	StaticData  string // kind "static": the JSON (or text) to show
+	PerUser     bool   // kind "push": everyone who installs an app using it sends their own data
+	Example     string // personal: JSON website previews show people who haven't sent their own
 }
 
 // SourceSecrets are the encrypted parts of a request. Only the website sends
@@ -92,6 +94,15 @@ func (l *Library) SaveSource(ctx context.Context, userID, id string, in SourceIn
 	}
 	src.IntervalSec = clamp(in.IntervalSec, 15, 86400)
 	src.Secret = l.eng.SealSecret(sec)
+	wasPersonal := src.PerUser
+	src.PerUser = in.PerUser && src.Kind == "push"
+	src.Example = ""
+	if ex := strings.TrimSpace(in.Example); src.PerUser && ex != "" {
+		if !json.Valid([]byte(ex)) {
+			return nil, invalid("The example data isn't valid JSON.")
+		}
+		src.Example = ex
+	}
 
 	if src.Name == "" {
 		return nil, invalid("Give the source a name.")
@@ -124,7 +135,13 @@ func (l *Library) SaveSource(ctx context.Context, userID, id string, in SourceIn
 	if src.Kind == "http" {
 		return l.FetchSource(ctx, userID, src.ID)
 	}
-	l.eng.PushSource(ctx, src.ID)
+	if src.PerUser != wasPersonal {
+		// Other people's boards switch between this data and their own.
+		screens, _ := l.st.ScreenIDsForSource(ctx, src.ID)
+		l.eng.PushScreens(ctx, screens...)
+	} else {
+		l.eng.PushSource(ctx, src)
+	}
 	return src, nil
 }
 
@@ -212,7 +229,7 @@ func (l *Library) CreateApp(ctx context.Context, userID, name, deviceID, madeBy 
 	} else if len(apps) >= MaxApps {
 		return nil, invalid("An account can have %d apps. Delete one first.", MaxApps)
 	}
-	name = limit(strings.TrimSpace(name), 40)
+	name = Limit(strings.TrimSpace(name), 40)
 	if name == "" {
 		name = "My app"
 	}
@@ -242,7 +259,7 @@ func (l *Library) UpdateApp(ctx context.Context, userID, id string, ch AppChange
 		return nil, err
 	}
 	if ch.Name != nil {
-		if n := limit(strings.TrimSpace(*ch.Name), 40); n != "" {
+		if n := Limit(strings.TrimSpace(*ch.Name), 40); n != "" {
 			a.Name = n
 		}
 	}
@@ -250,7 +267,7 @@ func (l *Library) UpdateApp(ctx context.Context, userID, id string, ch AppChange
 		a.CycleSec = clamp(*ch.CycleSec, 0, 3600)
 	}
 	if ch.Description != nil {
-		a.Description = limit(strings.TrimSpace(*ch.Description), 140)
+		a.Description = Limit(strings.TrimSpace(*ch.Description), 140)
 	}
 	if err := l.st.SaveApp(ctx, a); err != nil {
 		return nil, err
@@ -321,9 +338,9 @@ func (l *Library) prepare(ctx context.Context, userID string, sc *store.Screen, 
 	}
 	sc.Layout = in.Layout
 	sc.SourceID = in.SourceID
-	sc.Name = limit(strings.TrimSpace(in.Name), 40)
+	sc.Name = Limit(strings.TrimSpace(in.Name), 40)
 	if sc.Name == "" {
-		sc.Name = limit(spec.Title, 40)
+		sc.Name = Limit(spec.Title, 40)
 	}
 	if sc.Name == "" {
 		sc.Name = "Untitled screen"
@@ -429,6 +446,11 @@ func (l *Library) SetInstalled(ctx context.Context, userID, deviceID, appID stri
 			if ownOnly && a.UserID != userID {
 				return nil, ErrNotOwnApp
 			}
+			if a.UserID != userID {
+				if _, err := l.PersonalLinks(ctx, userID, appID); err != nil {
+					return nil, err
+				}
+			}
 		}
 		err = l.st.InstallApp(ctx, d.ID, appID)
 	} else {
@@ -441,6 +463,25 @@ func (l *Library) SetInstalled(ctx context.Context, userID, deviceID, appID stri
 	return d, nil
 }
 
+// PersonalLinks are the sources the user sends their own data to for an app:
+// for each personal source its screens use, the source itself when it's the
+// user's, else the user's copy of it, made now if they have none.
+func (l *Library) PersonalLinks(ctx context.Context, userID, appID string) ([]*store.Source, error) {
+	personal, err := l.st.PersonalSources(ctx, appID)
+	if err != nil {
+		return nil, err
+	}
+	for i, src := range personal {
+		if src.UserID == userID {
+			continue
+		}
+		if personal[i], err = l.st.EnsureSourceCopy(ctx, src, userID); err != nil {
+			return nil, err
+		}
+	}
+	return personal, nil
+}
+
 // IsUserError reports whether err is meant for the user (bad input, a cap)
 // rather than a server failure.
 func IsUserError(err error) (*Error, bool) {
@@ -451,8 +492,8 @@ func IsUserError(err error) (*Error, bool) {
 
 func clamp(n, lo, hi int) int { return max(lo, min(hi, n)) }
 
-// limit cuts s to at most n characters.
-func limit(s string, n int) string {
+// Limit cuts s to at most n characters.
+func Limit(s string, n int) string {
 	if r := []rune(s); len(r) > n {
 		return string(r[:n])
 	}

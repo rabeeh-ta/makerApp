@@ -21,8 +21,8 @@ export function Layout({ me, path, onSignOut, children }: { me: Me; path: string
             <>
               <nav>
                 <Link to="/devices" className={on('/devices', '/flash')}>Devices</Link>
-                <Link to="/apps" className={on('/apps', '/screens')}>Apps</Link>
-                <Link to="/sources" className={on('/sources')}>Data</Link>
+                <Link to="/apps" className={on('/apps', '/screens', '/sources')}>My apps</Link>
+                <Link to="/store" className={on('/store')}>App Store</Link>
                 <Link to="/connect" className={on('/connect')}>AI Builder</Link>
               </nav>
               <div className="who">

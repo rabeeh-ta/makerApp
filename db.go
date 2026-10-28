@@ -164,6 +164,18 @@ var migrations = []string{
 		used_at TEXT                            -- refresh tokens: when exchanged; a second use revokes the grant
 	)`,
 	`CREATE INDEX idx_oauth_tokens_grant ON oauth_tokens(grant_id)`,
+
+	// A personal source: everyone who installs an app using it sends their own
+	// data, to their own copy of it (origin_id is the source it copies). The
+	// owner's data never reaches anyone else's board.
+	`ALTER TABLE sources ADD COLUMN per_user INTEGER NOT NULL DEFAULT 0 CHECK (per_user IN (0, 1))`,
+	`ALTER TABLE sources ADD COLUMN origin_id TEXT REFERENCES sources(id) ON DELETE CASCADE`,
+	`CREATE UNIQUE INDEX idx_sources_origin ON sources(origin_id, user_id) WHERE origin_id IS NOT NULL`,
+	// How to set an app up, shown on its App Store page.
+	`ALTER TABLE apps ADD COLUMN setup TEXT NOT NULL DEFAULT ''`,
+	// A personal source's example data: what previews on the website show
+	// someone who hasn't sent their own yet. Boards only ever show real data.
+	`ALTER TABLE sources ADD COLUMN example TEXT NOT NULL DEFAULT ''`,
 }
 
 func migrate(db *sql.DB) error {

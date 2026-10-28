@@ -5,21 +5,18 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"makerapp/internal/engine"
 	"makerapp/internal/games"
 	"makerapp/internal/library"
 	"makerapp/internal/store"
 )
 
 // Apps are what a board lists in its Apps drawer. Your own apps are named,
-// ordered sets of screens made here. The public list holds makerApp's own apps
-// (engine.Catalog, games included) and apps people publish; anyone can
-// install those, and every board that does counts as an install.
+// ordered sets of screens made here; the App Store (store.go) lists the ones
+// anyone can install.
 
 var cycleOpts = []int{0, 10, 20, 30, 60, 300}
 
@@ -29,35 +26,6 @@ type appCard struct {
 	Installs    int
 	Preview     *webScreen
 	On          []*store.Device // devices it's installed on
-}
-
-// listing is an app in the public list: makerApp's own, or one someone published.
-type listing struct {
-	ID, Name, Desc, By string
-	Installs           int
-	Preview            *webScreen
-	On                 []*store.Device // the user's devices it's installed on
-}
-
-// listings is the public list, most installed first.
-func (s *Server) listings(r *http.Request, on map[string][]*store.Device) []listing {
-	counts, _ := s.st.InstallCounts(r.Context())
-	var out []listing
-	for _, a := range engine.Catalog {
-		p := s.eng.CatalogPreview(a.ID)
-		out = append(out, listing{ID: a.ID, Name: a.Name, Desc: a.Desc, By: a.Publisher, Installs: counts[a.ID],
-			Preview: toWeb(p), On: on[a.ID]})
-	}
-	published, _ := s.st.PublishedApps(r.Context())
-	for _, p := range published {
-		l := listing{ID: p.ID, Name: p.Name, Desc: p.Description, By: p.Publisher, Installs: counts[p.ID], On: on[p.ID]}
-		if screens, _ := s.st.AppScreens(r.Context(), p.ID); len(screens) > 0 {
-			l.Preview = toWeb(s.eng.PreviewScreen(r.Context(), screens[0], nil))
-		}
-		out = append(out, l)
-	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Installs > out[j].Installs })
-	return out
 }
 
 func (s *Server) apps(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +46,7 @@ func (s *Server) apps(w http.ResponseWriter, r *http.Request) {
 		}
 		cards = append(cards, c)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"Apps": cards, "Public": s.listings(r, on), "Devices": devices,
-		"Username": u.Username})
+	writeJSON(w, http.StatusOK, map[string]any{"Apps": cards, "Username": u.Username})
 }
 
 // installedOn maps app IDs to the devices they're installed on.
@@ -123,10 +90,16 @@ func (s *Server) app(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	screens, _ := s.st.AppScreens(r.Context(), a.ID)
-	// Sources whose data anyone who installs the app would see.
-	var sources []string
+	// Sources whose data anyone who installs the app would see, and personal
+	// ones they each send their own data to.
+	var sources, personal []string
 	for _, sc := range screens {
-		if src, err := s.st.UserSource(r.Context(), a.UserID, sc.SourceID); err == nil && !slices.Contains(sources, src.Name) {
+		src, err := s.st.UserSource(r.Context(), a.UserID, sc.SourceID)
+		switch {
+		case err != nil:
+		case src.PerUser && !slices.Contains(personal, src.Name):
+			personal = append(personal, src.Name)
+		case !src.PerUser && !slices.Contains(sources, src.Name):
 			sources = append(sources, src.Name)
 		}
 	}
@@ -149,16 +122,21 @@ func (s *Server) app(w http.ResponseWriter, r *http.Request) {
 		"Username":  currentUser(r).Username,
 		"Installs":  counts[a.ID],
 		"Sources":   sources,
+		"Personal":  personal,
 	})
 }
+
+// maxSetup is how long an app's setup instructions can be.
+const maxSetup = 4000
 
 var usernameRe = regexp.MustCompile(`^[a-z0-9_-]{3,20}$`)
 
 // Names people can't take, so nobody poses as makerApp.
 var reservedNames = []string{"makerinc", "makerapp", "maker", "esphog", "admin", "support", "official"}
 
-// publishApp makes the app public right away: anyone can find and install it.
-// The first time, the user also picks the public name it's shown under.
+// publishApp makes the app public right away: anyone can find and install it
+// in the App Store. The first time, the user also picks the public name it's
+// shown under. Posting again saves its description and setup instructions.
 func (s *Server) publishApp(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.loadApp(w, r)
 	if !ok {
@@ -166,6 +144,7 @@ func (s *Server) publishApp(w http.ResponseWriter, r *http.Request) {
 	}
 	u := currentUser(r)
 	a.Description = strings.TrimSpace(r.FormValue("description"))
+	a.Setup = library.Limit(strings.TrimSpace(strings.ReplaceAll(r.FormValue("setup"), "\r\n", "\n")), maxSetup)
 	if u.Username == "" {
 		name := strings.ToLower(strings.TrimSpace(r.FormValue("username")))
 		if !usernameRe.MatchString(name) || slices.Contains(reservedNames, name) {
@@ -188,15 +167,17 @@ func (s *Server) publishApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "Add a short description, so people know what it shows.")
 		return
 	}
-	if len(a.Description) > 140 {
-		a.Description = a.Description[:140]
+	a.Description = library.Limit(a.Description, 140)
+	note := "store"
+	if a.PublishedAt == 0 {
+		a.PublishedAt = time.Now().Unix()
+		note = "published"
 	}
-	a.PublishedAt = time.Now().Unix()
 	if err := s.st.SaveApp(r.Context(), a); err != nil {
 		fail(w, http.StatusInternalServerError, "server error")
 		return
 	}
-	redirect(w, "/apps/"+a.ID+"?saved=published")
+	redirect(w, "/apps/"+a.ID+"?saved="+note)
 }
 
 // unpublishApp takes it out of the public list and off other people's boards.

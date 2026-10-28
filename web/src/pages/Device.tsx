@@ -52,7 +52,7 @@ export function Device({ id }: { id: string }) {
         <div className="grid cards">
           {installed.map((a) => (
             <div className="card screen-card" key={a.id}>
-              <Link className="screen-link" to={a.Catalog ? '/apps' : `/apps/${a.id}`}>
+              <Link className="screen-link" to={a.Catalog ? `/store/${a.id}` : `/apps/${a.id}`}>
                 <Thumb s={a.Preview} empty="No screens yet" />
                 <div className="row between">
                   <strong>{a.name}</strong>
@@ -93,7 +93,7 @@ export function Device({ id }: { id: string }) {
             {choices.map((c) => (
               <div className="install-row" key={c.ID}>
                 <div className="grow">
-                  <strong>{c.Name}</strong>
+                  {c.By ? <Link to={`/store/${c.ID}`}><strong>{c.Name}</strong></Link> : <strong>{c.Name}</strong>}
                   {c.By && (
                     <>
                       {' '}

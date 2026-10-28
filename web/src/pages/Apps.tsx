@@ -1,43 +1,37 @@
-import { Byline, ErrorNotice, Loading } from '../components/common'
+import { Byline, ErrorNotice, Loading, MyAppsHead } from '../components/common'
 import { Thumb } from '../components/DeviceScreen'
 import { plural, useTitle } from '../lib/format'
-import { Link, PostButton, useData, useForm } from '../lib/router'
+import { Link, useData, useForm } from '../lib/router'
 import type { App, Device, Me, Screen } from '../lib/types'
 
 type Data = {
   Apps: (App & { ScreenCount: number; Installs: number; Preview: Screen | null; On: Device[] | null })[] | null
-  Public: { ID: string; Name: string; Desc: string; By: string; Installs: number; Preview: Screen | null; On: Device[] | null }[] | null
-  Devices: Device[] | null
   Username: string
 }
 
 export function Apps({ me }: { me: Me }) {
-  useTitle('Apps')
+  useTitle('My apps')
   const { data, error } = useData<Data>('/api/apps')
   const newApp = useForm()
   if (!data) return <Loading error={error} />
   const apps = data.Apps ?? []
-  const devices = data.Devices ?? []
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Apps</h1>
-          <p className="muted small">
-            Install apps on a board and they show up in its Apps drawer. Make your own from screens, and publish them for anyone to install.
-          </p>
-        </div>
-        <div className="row">
-          <Link className="btn ghost" to="/connect">Build with AI</Link>
-          <form onSubmit={newApp.submit('/api/apps')} className="row">
-            <input name="name" placeholder="New app name" maxLength={40} required className="inline-input" />
-            <button className="btn" disabled={newApp.busy}>New app</button>
-          </form>
-        </div>
-      </div>
+      <MyAppsHead
+        tab="apps"
+        intro="Apps you made from screens. Install them on a board, or publish them in the App Store for anyone to install."
+        actions={
+          <>
+            <Link className="btn ghost" to="/connect">Build with AI</Link>
+            <form onSubmit={newApp.submit('/api/apps')} className="row">
+              <input name="name" placeholder="New app name" maxLength={40} required className="inline-input" />
+              <button className="btn" disabled={newApp.busy}>New app</button>
+            </form>
+          </>
+        }
+      />
       <ErrorNotice error={newApp.error} />
 
-      <h3 className="section-title">Your apps</h3>
       {apps.length ? (
         <div className="grid cards">
           {apps.map((a) => (
@@ -65,38 +59,9 @@ export function Apps({ me }: { me: Me }) {
         </div>
       )}
 
-      <h3 className="section-title">All apps</h3>
       <p className="muted small section-note">
-        Made by makerApp and by people who published theirs, most installed first. In apps that use the middle button, hold it for a second to leave.
+        Looking for clocks, games and apps other people made? <Link to="/store">Browse the App Store</Link>.
       </p>
-      <div className="grid cards">
-        {(data.Public ?? []).map((l) => (
-          <div className="card screen-card" key={l.ID}>
-            <Thumb s={l.Preview} empty="No preview" />
-            <div className="row between">
-              <strong>{l.Name}</strong>
-              <Byline by={l.By} installs={l.Installs} />
-            </div>
-            <div className="muted small">{l.Desc}</div>
-            <div className="card-foot">
-              {devices.map((d) => (
-                <div className="install-row" key={d.ID}>
-                  <span className="grow small">{d.Name}</span>
-                  {l.On?.some((x) => x.ID === d.ID) ? (
-                    <PostButton action={`/api/apps/${l.ID}/uninstall`} data={{ device: d.ID, back: '/apps' }} className="btn ghost small">
-                      Uninstall
-                    </PostButton>
-                  ) : (
-                    <PostButton action={`/api/apps/${l.ID}/install`} data={{ device: d.ID, back: '/apps' }}>
-                      Install
-                    </PostButton>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
     </>
   )
 }

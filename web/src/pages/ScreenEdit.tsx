@@ -84,7 +84,7 @@ function Editor({ data, saved }: { data: Data; saved: boolean }) {
       <div className="page-head">
         <div>
           <p className="crumbs">
-            <Link to="/apps">Apps</Link> /
+            <Link to="/apps">My apps</Link> /
             {data.App && (
               <>
                 {' '}

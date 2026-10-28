@@ -26,16 +26,17 @@ maker.app.rabeeta.xyz  ── one binary (./app) on Sideyard ──────�
    **Install**, and enter your WiFi details when asked. The flasher writes a small
    settings block containing a one-time claim token, so the board shows up in your
    account by itself, with no ID or code to type.
-3. **Data → New source**: any HTTP request with a token, such as PostHog, HubSpot or
+3. **My apps → Data sources → New source**: any HTTP request with a token, such as PostHog, HubSpot or
    your own API. Templates only prefill the form. makerApp fetches it on the
    interval you choose and keeps the latest JSON. There are also *Fixed data*
    (type JSON in) and *Webhook* (POST JSON to a private URL from scripts or Zapier)
    sources.
-4. **Apps → New app**, then **New screen** inside it: pick a layout (big number,
+4. **My apps → New app**, then **New screen** inside it: pick a layout (big number,
    list, text, sparkline, progress) and click fields from the data panel to
    insert `{{ path }}`. Saving updates every board with the app within a second.
 5. **Install** the app on a board, from the app's page or the device's Apps tab.
-   The built-in **Clock** installs the same way. A new board starts with no apps.
+   The built-in **Clock** and the games are in the **App Store**. A new board
+   starts with no apps.
 
 A board that wasn't flashed from your account (or was removed from it) shows a
 6-digit code: enter it under **Devices → Enter it here**, or open the link the
@@ -99,16 +100,28 @@ Data refreshes on each source's interval; there are no per-button actions.
 
 ### Publishing
 
-On an app's page, **Publish** puts it in **All apps** for anyone to install,
-straight away (no review). The first time, you pick a public name; apps show as
-**@name**. People who install it see the app's data, fetched with your sources,
-and your edits reach their boards immediately. **Unpublish** takes it off the
-list and off other people's boards. Every board that has ever installed an app
-counts as an install, and All apps is sorted by that.
+On an app's page, **Publish** puts it in the **App Store** for anyone to
+install, straight away (no review). The first time, you pick a public name; apps
+show as **@name**. People who install it see the app's data, fetched with your
+sources, and your edits reach their boards immediately. **Unpublish** takes it
+off the App Store and off other people's boards. Every board that has ever
+installed an app counts as an install, and the App Store is sorted by that.
+
+Every app in the App Store has its own page: its screens, **Install** for each of
+your boards, and **Setup**, the instructions its publisher wrote.
+
+A webhook source can be **personal**, for data about a person (their usage,
+their steps) rather than shared data (a price, the weather). When the app is
+published, everyone who installs it gets their own copy of the source with their
+own push link, shown under Setup, and their boards show only what they send. The
+publisher's data never reaches anyone else's board or the App Store previews.
+Write `{{push_url}}` in the setup instructions where each person's link goes. Give the source
+**example data** (JSON in the shape your script sends) so the App Store previews
+show something until each person sends their own; boards only show real data.
 
 ### makerApp's apps
 
-These are in All apps too, published as **@makerInc**.
+These are in the App Store too, published as **@makerInc**.
 
 | App | Buttons |
 |---|---|

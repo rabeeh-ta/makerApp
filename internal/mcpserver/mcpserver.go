@@ -69,7 +69,7 @@ func Instructions() string {
 	return `makerApp puts data on a small desk display, the makerDevice board (240x135 screen, three buttons). You're connected to the user's makerApp account.
 
 What things are:
-- A data source fetches JSON: a request (kind http, refreshed on an interval), fixed data (static), or a webhook (push) that scripts POST JSON to.
+- A data source fetches JSON: a request (kind http, refreshed on an interval), fixed data (static), or a webhook (push) that scripts POST JSON to. A push source can be personal (per_user): when the app is published, everyone who installs it gets their own push link and sees only their own data. Use it for data about the person (their usage, their steps), not shared data (a price, the weather).
 - An app is a named set of screens. The board lists installed apps in its Apps drawer. Inside an app the top and bottom buttons move between screens and the middle button goes back; cycle_sec turns the screens by itself.
 - A screen shows data in a layout. Its text fields are templates, {{ path | formatter }}, reading the source's JSON with gjson paths.
 
@@ -224,6 +224,8 @@ type sourceView struct {
 	Sample      string   `json:"sample,omitempty" jsonschema:"the latest data, trimmed"`
 	Paths       []string `json:"paths,omitempty" jsonschema:"paths templates can use, with example values"`
 	PushURL     string   `json:"push_url,omitempty" jsonschema:"webhook sources: POST JSON here"`
+	PerUser     bool     `json:"per_user,omitempty" jsonschema:"personal: everyone who installs the published app sends their own data"`
+	Example     string   `json:"example,omitempty" jsonschema:"personal: the example data App Store previews show"`
 	NeedsKey    string   `json:"needs_key,omitempty"`
 	Link        string   `json:"link"`
 }
@@ -237,7 +239,7 @@ func (s *server) sourceView(src *store.Source) sourceView {
 	case "http":
 		v.Method, v.URL, v.Body, v.IntervalSec = src.Method, src.URL, src.Body, src.IntervalSec
 	case "push":
-		v.PushURL = s.link("/push/" + src.PushToken)
+		v.PushURL, v.PerUser, v.Example = s.link("/push/"+src.PushToken), src.PerUser, src.Example
 	}
 	v.Sample, v.Paths = sample(src.LastData)
 	if src.LastStatus == http.StatusUnauthorized || src.LastStatus == http.StatusForbidden {
@@ -531,6 +533,8 @@ type createSourceIn struct {
 	Body        string `json:"body,omitempty" jsonschema:"http: JSON body for POST, PUT and PATCH"`
 	IntervalSec int    `json:"interval_sec,omitempty" jsonschema:"http: seconds between fetches, 15 to 86400 (default 300)"`
 	StaticData  string `json:"static_data,omitempty" jsonschema:"static: the JSON to show"`
+	PerUser     bool   `json:"per_user,omitempty" jsonschema:"push: personal, so everyone who installs the published app sends their own data"`
+	Example     string `json:"example,omitempty" jsonschema:"personal: example JSON, in the shape scripts send, that App Store previews show people who haven't sent their own"`
 }
 
 func (s *server) createSource(ctx context.Context, req *mcp.CallToolRequest, in createSourceIn) (*mcp.CallToolResult, sourceView, error) {
@@ -545,7 +549,7 @@ func (s *server) createSource(ctx context.Context, req *mcp.CallToolRequest, in 
 		return nil, sourceView{}, errors.New("too many requests: wait a minute")
 	}
 	src, err := s.Library.SaveSource(ctx, c.userID, "", library.SourceInput{Name: in.Name, Kind: in.Kind, Method: in.Method,
-		URL: in.URL, Body: in.Body, IntervalSec: in.IntervalSec, StaticData: in.StaticData}, nil)
+		URL: in.URL, Body: in.Body, IntervalSec: in.IntervalSec, StaticData: in.StaticData, PerUser: in.PerUser, Example: in.Example}, nil)
 	if err != nil {
 		return nil, sourceView{}, fail(err, "data source")
 	}
@@ -560,6 +564,8 @@ type updateSourceIn struct {
 	Body        *string `json:"body,omitempty"`
 	IntervalSec *int    `json:"interval_sec,omitempty"`
 	StaticData  *string `json:"static_data,omitempty"`
+	PerUser     *bool   `json:"per_user,omitempty" jsonschema:"push: personal, so everyone who installs the published app sends their own data"`
+	Example     *string `json:"example,omitempty" jsonschema:"personal: example JSON that App Store previews show people who haven't sent their own"`
 }
 
 func (s *server) updateSource(ctx context.Context, req *mcp.CallToolRequest, in updateSourceIn) (*mcp.CallToolResult, sourceView, error) {
@@ -577,12 +583,16 @@ func (s *server) updateSource(ctx context.Context, req *mcp.CallToolRequest, in 
 		}
 	}
 	si := library.SourceInput{Name: src.Name, Kind: src.Kind, Method: src.Method, URL: src.URL, Body: src.Body,
-		IntervalSec: src.IntervalSec, StaticData: src.LastData}
+		IntervalSec: src.IntervalSec, StaticData: src.LastData, PerUser: src.PerUser, Example: src.Example}
+	if in.PerUser != nil {
+		si.PerUser = *in.PerUser
+	}
 	set(&si.Name, in.Name)
 	set(&si.Method, in.Method)
 	set(&si.URL, in.URL)
 	set(&si.Body, in.Body)
 	set(&si.StaticData, in.StaticData)
+	set(&si.Example, in.Example)
 	if in.IntervalSec != nil {
 		si.IntervalSec = *in.IntervalSec
 	}

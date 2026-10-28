@@ -1,4 +1,4 @@
-import { Loading } from '../components/common'
+import { Loading, MyAppsHead } from '../components/common'
 import { ago, plural, useTitle } from '../lib/format'
 import { Link, useData } from '../lib/router'
 import type { Source } from '../lib/types'
@@ -10,12 +10,11 @@ export function Sources() {
   const list = data.Sources ?? []
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Data sources</h1>
-        </div>
-        <Link className="btn" to="/sources/new">New source</Link>
-      </div>
+      <MyAppsHead
+        tab="sources"
+        intro="Where your apps' screens get their data: an API request, fixed data, or a webhook your scripts send JSON to."
+        actions={<Link className="btn" to="/sources/new">New source</Link>}
+      />
       {list.length ? (
         <div className="table card">
           <div className="tr th">
@@ -38,7 +37,7 @@ export function Sources() {
                   </>
                 )}
               </span>
-              <span>{s.Kind === 'http' ? 'Request' : s.Kind === 'static' ? 'Fixed data' : 'Webhook'}</span>
+              <span>{s.Kind === 'http' ? 'Request' : s.Kind === 'static' ? 'Fixed data' : s.PerUser ? 'Webhook · personal' : 'Webhook'}</span>
               <span>{s.Kind === 'http' ? `every ${s.IntervalSec}s` : '—'}</span>
               <span>{s.LastError ? <span className="badge off">error</span> : ago(s.LastFetchedAt)}</span>
               <span>{plural(s.ScreenCount, 'screen')}</span>

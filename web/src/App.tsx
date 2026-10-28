@@ -20,6 +20,8 @@ import { Pair } from './pages/Pair'
 import { ScreenEdit } from './pages/ScreenEdit'
 import { SourceEdit } from './pages/SourceEdit'
 import { Sources } from './pages/Sources'
+import { Store } from './pages/Store'
+import { StoreApp } from './pages/StoreApp'
 
 type Route = { re: RegExp; page: (p: string[], me: Me, refreshMe: () => Promise<void>) => React.ReactNode; open?: boolean }
 
@@ -36,6 +38,8 @@ const routes: Route[] = [
   { re: /^\/apps$/, page: (_, me) => <Apps me={me} /> },
   { re: /^\/apps\/([^/]+)$/, page: ([id]) => <AppPage id={id} /> },
   { re: /^\/screens\/([^/]+)$/, page: ([id]) => <ScreenEdit key={id} id={id === 'new' ? '' : id} /> },
+  { re: /^\/store$/, page: () => <Store /> },
+  { re: /^\/store\/([^/]+)$/, page: ([id]) => <StoreApp key={id} id={id} /> },
   { re: /^\/connect$/, page: () => <Connect /> },
   { re: /^\/account$/, page: () => <Account /> },
   { re: /^\/oauth\/authorize$/, page: () => <OAuthAuthorize /> },

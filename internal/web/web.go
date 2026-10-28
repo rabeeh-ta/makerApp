@@ -105,6 +105,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/apps/{id}/unpublish", s.auth(s.unpublishApp))
 	mux.HandleFunc("POST /api/apps/{id}/screens/{sid}/move", s.auth(s.moveAppScreen))
 
+	// App Store
+	mux.HandleFunc("GET /api/store", s.auth(s.storeList))
+	mux.HandleFunc("GET /api/store/{id}", s.auth(s.storeApp))
+
 	// Screens
 	mux.HandleFunc("GET /api/screens/new", s.auth(s.screenEdit))
 	mux.HandleFunc("POST /api/screens", s.auth(s.saveScreen))

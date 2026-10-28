@@ -444,7 +444,7 @@ func (e *Engine) DeviceApps(ctx context.Context, dev *store.Device, preview bool
 			Catalog: a.UserID != dev.UserID, By: by}
 		screens, _ := e.st.AppScreens(ctx, a.ID)
 		for _, sc := range screens {
-			v.Screens = append(v.Screens, e.renderScreen(ctx, sc, cache, preview))
+			v.Screens = append(v.Screens, e.renderScreen(ctx, sc, cache, preview, dev.UserID))
 		}
 		out = append(out, v)
 	}
@@ -454,33 +454,68 @@ func (e *Engine) DeviceApps(ctx context.Context, dev *store.Device, preview bool
 // ---- rendering & pushing ----
 
 // RenderScreen resolves a screen for the device: {{ device.* }} fields stay as
-// markers the board fills in itself.
+// markers the board fills in itself. It shows the screen owner's data.
 func (e *Engine) RenderScreen(ctx context.Context, s *store.Screen, cache map[string]*store.Source) render.Screen {
-	return e.renderScreen(ctx, s, cache, false)
+	return e.renderScreen(ctx, s, cache, false, s.UserID)
 }
 
-// PreviewScreen resolves a screen for the website, with sample device values.
+// PreviewScreen resolves a screen for the website, with sample device values,
+// as its owner sees it.
 func (e *Engine) PreviewScreen(ctx context.Context, s *store.Screen, cache map[string]*store.Source) render.Screen {
-	return e.renderScreen(ctx, s, cache, true)
+	return e.renderScreen(ctx, s, cache, true, s.UserID)
 }
 
 // PreviewScreens is PreviewScreen for a list.
 func (e *Engine) PreviewScreens(ctx context.Context, screens []*store.Screen) []render.Screen {
+	return e.PreviewScreensFor(ctx, screens, "")
+}
+
+// PreviewScreensFor previews screens as viewer sees them: with their own data
+// where a source is personal. viewer "" is each screen's owner.
+func (e *Engine) PreviewScreensFor(ctx context.Context, screens []*store.Screen, viewer string) []render.Screen {
 	cache := map[string]*store.Source{}
 	out := make([]render.Screen, 0, len(screens))
 	for _, s := range screens {
-		out = append(out, e.PreviewScreen(ctx, s, cache))
+		v := viewer
+		if v == "" {
+			v = s.UserID
+		}
+		out = append(out, e.renderScreen(ctx, s, cache, true, v))
 	}
 	return out
 }
 
-func (e *Engine) renderScreen(ctx context.Context, s *store.Screen, cache map[string]*store.Source, preview bool) render.Screen {
+// dataSource is where a screen's data comes from for viewer: the source
+// itself, or the viewer's own copy when the source is personal and someone
+// else's. Until they send data of their own, previews show the source's example
+// and boards show nothing. nil means no data.
+func (e *Engine) dataSource(ctx context.Context, sourceID, viewer string, preview bool) *store.Source {
+	src, err := e.st.Source(ctx, sourceID)
+	if err != nil {
+		return nil
+	}
+	if !src.PerUser || src.UserID == viewer {
+		return src
+	}
+	own, err := e.st.SourceCopy(ctx, sourceID, viewer)
+	if err == nil && own.LastData != "" {
+		return own
+	}
+	if preview && src.Example != "" {
+		return &store.Source{LastData: src.Example}
+	}
+	return nil
+}
+
+// renderScreen resolves a screen as viewer sees it. A cache holds sources
+// resolved for one viewer only.
+func (e *Engine) renderScreen(ctx context.Context, s *store.Screen, cache map[string]*store.Source, preview bool, viewer string) render.Screen {
 	rc := render.Context{Loc: e.loc, Preview: preview}
 	var srcErr string
 	if s.SourceID != "" {
 		src, ok := cache[s.SourceID]
 		if !ok {
-			src, _ = e.st.Source(ctx, s.SourceID)
+			src = e.dataSource(ctx, s.SourceID, viewer, preview)
 			if cache != nil {
 				cache[s.SourceID] = src
 			}
@@ -636,12 +671,25 @@ func (e *Engine) DevicesShowing(ctx context.Context, screenID string) []string {
 	return ids
 }
 
-func (e *Engine) PushSource(ctx context.Context, sourceID string) {
-	ids, err := e.st.ScreenIDsForSource(ctx, sourceID)
+// PushSource re-sends state to the devices showing the source's data. A
+// personal source's data, and a copy's, shows only on its owner's devices.
+func (e *Engine) PushSource(ctx context.Context, src *store.Source) {
+	shown := src.ID
+	if src.OriginID != "" {
+		shown = src.OriginID // the copy's screens are the original's
+	}
+	ids, err := e.st.ScreenIDsForSource(ctx, shown)
 	if err != nil || len(ids) == 0 {
 		return
 	}
-	e.PushScreens(ctx, ids...)
+	if !src.PerUser && src.OriginID == "" {
+		e.PushScreens(ctx, ids...)
+		return
+	}
+	devices, _ := e.st.UserDevicesForScreens(ctx, src.UserID, ids)
+	for _, id := range devices {
+		e.PushDevice(ctx, id)
+	}
 }
 
 // ---- data sources ----
@@ -716,7 +764,7 @@ func (e *Engine) end(id string) {
 // Refresh fetches a source now and pushes the result to devices showing it.
 func (e *Engine) Refresh(ctx context.Context, src *store.Source) error {
 	if src.Kind != "http" {
-		e.PushSource(ctx, src.ID)
+		e.PushSource(ctx, src)
 		return nil
 	}
 	if !e.begin(src.ID) {
@@ -744,7 +792,7 @@ func (e *Engine) refresh(ctx context.Context, src *store.Source) error {
 		return err
 	}
 	if res.Data != src.LastData {
-		e.PushSource(ctx, src.ID)
+		e.PushSource(ctx, src)
 	}
 	return nil
 }
@@ -754,6 +802,6 @@ func (e *Engine) SetPushedData(ctx context.Context, src *store.Source, data stri
 	if err := e.st.SetSourceResult(ctx, src.ID, data, 200, ""); err != nil {
 		return err
 	}
-	e.PushSource(ctx, src.ID)
+	e.PushSource(ctx, src)
 	return nil
 }

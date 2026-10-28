@@ -53,6 +53,8 @@ export type Source = {
   LastError: string
   LastFetchedAt: number
   CreatedAt: number
+  PerUser: boolean // personal: everyone who installs an app using it sends their own data
+  Example: string // personal: JSON previews show people who haven't sent their own
 }
 
 export type App = {
@@ -65,6 +67,7 @@ export type App = {
   Description: string
   PublishedAt: number
   MadeBy: string // the AI app that made it, "" if made here
+  Setup: string // how to set it up, shown on its App Store page
 }
 
 export type StoredScreen = {

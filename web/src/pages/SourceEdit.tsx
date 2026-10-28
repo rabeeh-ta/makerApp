@@ -123,7 +123,7 @@ function Editor({ data }: { data: Data }) {
       <div className="page-head">
         <div>
           <p className="crumbs">
-            <Link to="/sources">Data</Link> /
+            <Link to="/sources">Data sources</Link> /
           </p>
           <h1>{s.ID ? s.Name : 'New data source'}</h1>
         </div>
@@ -312,6 +312,14 @@ function Editor({ data }: { data: Data }) {
 
           <div className="stack" hidden={kind !== 'push'}>
             <p className="muted small">POST JSON to this URL to update the data.</p>
+            <label className="check" title="For data about a person, like their usage or steps, not shared data like a price.">
+              <input type="checkbox" name="per_user" value="1" defaultChecked={s.PerUser} />
+              Personal: when you publish an app using it, everyone who installs the app sends their own data
+            </label>
+            <label>
+              Example data <span className="muted small">personal sources: what App Store previews show people before they send their own</span>
+              <textarea name="example" rows={4} className="mono" spellCheck={false} defaultValue={s.Example} placeholder='{"session": {"used": 37}}' />
+            </label>
             {s.ID && s.PushToken ? (
               <>
                 <label>

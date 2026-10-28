@@ -118,6 +118,8 @@ func (s *Server) saveSource(w http.ResponseWriter, r *http.Request) {
 		Body:        r.FormValue("body"),
 		IntervalSec: atoi(r.FormValue("interval_sec"), 300),
 		StaticData:  r.FormValue("static_data"),
+		PerUser:     r.FormValue("per_user") == "1",
+		Example:     r.FormValue("example"),
 	}
 	sec := &library.SourceSecrets{Auth: r.FormValue("auth"), ClearAuth: r.FormValue("clear_auth") == "1"}
 	hk, hv := r.Form["hk"], r.Form["hv"]

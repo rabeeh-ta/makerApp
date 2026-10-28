@@ -11,13 +11,15 @@ type Data = {
   CycleOpts: number[]
   Username: string
   Installs: number
-  Sources: string[] | null
+  Sources: string[] | null // shared: everyone who installs it sees this data
+  Personal: string[] | null // everyone who installs it sends their own
 }
 
 const savedNotes: Record<string, string> = {
   '1': 'Saved. Boards with this app have the update.',
   added: 'Screen added.',
-  published: 'Published. Anyone can find it under All apps and install it.',
+  published: 'Published. Anyone can find it in the App Store and install it.',
+  store: 'Saved. The App Store page has the update.',
   unpublished: "Unpublished. It's off the list and off other people's boards.",
 }
 
@@ -35,7 +37,7 @@ export function AppPage({ id }: { id: string }) {
       <div className="page-head">
         <div>
           <p className="crumbs">
-            <Link to="/apps">Apps</Link> /
+            <Link to="/apps">My apps</Link> /
           </p>
           <h1>{app.Name}</h1>
           {app.MadeBy && <span className="pill made-by">Made with {app.MadeBy}</span>}
@@ -158,27 +160,25 @@ function Publish({ data }: { data: Data }) {
   const app = data.App
   const { error, busy, submit } = useForm()
   const sources = data.Sources ?? []
-  if (app.PublishedAt) {
-    return (
-      <section className="card">
-        <h3>Publish</h3>
-        <p className="small row public-row">
-          Public as <Byline by={data.Username} installs={data.Installs} />
-        </p>
-        <p className="muted small">{app.Description}</p>
-        <p className="muted small">Changes you make reach everyone's boards right away.</p>
-        <PostButton action={`/api/apps/${app.ID}/unpublish`} className="btn ghost small" confirm={`Unpublish “${app.Name}”? It comes off the list and off other people's boards.`}>
-          Unpublish
-        </PostButton>
-      </section>
-    )
-  }
+  const personal = data.Personal ?? []
+  const published = app.PublishedAt > 0
   return (
     <section className="card">
       <h3>Publish</h3>
       <ErrorNotice error={error} />
+      {published ? (
+        <div className="stack tight">
+          <p className="small row public-row">
+            Public as <Byline by={data.Username} installs={data.Installs} />
+          </p>
+          <p className="muted small">
+            Changes you make reach everyone's boards right away. <Link to={`/store/${app.ID}`}>See its App Store page</Link>.
+          </p>
+        </div>
+      ) : (
+        <p className="muted small">Anyone can find it in the App Store and install it, straight away.</p>
+      )}
       <form onSubmit={submit(`/api/apps/${app.ID}/publish`)} className="stack">
-        <p className="muted small">Anyone can find it under All apps and install it, straight away.</p>
         {!data.Username && (
           <label>
             Your public name
@@ -189,13 +189,30 @@ function Publish({ data }: { data: Data }) {
           Short description
           <input name="description" required maxLength={140} defaultValue={app.Description} placeholder="What it shows" />
         </label>
+        <label>
+          Setup instructions <span className="muted small">optional, shown on its App Store page</span>
+          <textarea name="setup" rows={5} maxLength={4000} defaultValue={app.Setup} className="mono" placeholder="What people do after installing it, like a script to run." />
+        </label>
+        {personal.length > 0 && (
+          <p className="muted small">
+            Everyone who installs it sends their own data to {personal.map((s) => `“${s}”`).join(', ')}, and gets their own push link on the App Store page.
+            Write {'{{push_url}}'} in the instructions where their link goes.
+          </p>
+        )}
         {sources.length > 0 && (
           <p className="warn small">
             Everyone who installs it sees the data from {sources.map((s) => `“${s}”`).join(', ')}, fetched with your account.
           </p>
         )}
-        <button className="btn small" disabled={busy}>Publish{data.Username && ` as @${data.Username}`}</button>
+        <button className="btn small" disabled={busy}>
+          {published ? 'Save' : `Publish${data.Username ? ` as @${data.Username}` : ''}`}
+        </button>
       </form>
+      {published && (
+        <PostButton action={`/api/apps/${app.ID}/unpublish`} className="btn ghost small" confirm={`Unpublish “${app.Name}”? It comes off the App Store and off other people's boards.`}>
+          Unpublish
+        </PostButton>
+      )}
     </section>
   )
 }
