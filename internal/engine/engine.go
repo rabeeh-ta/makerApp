@@ -4,6 +4,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -46,6 +47,9 @@ type conn struct {
 	send chan []byte
 	base string // http(s)://host the device reached us on, for OTA links
 	fw   string
+
+	mu    sync.Mutex
+	state []byte // the last "state" message queued, see RefreshTimes
 }
 
 func New(st *store.Store, box *secret.Box, fc *fetch.Client, loc *time.Location, log *slog.Logger) *Engine {
@@ -100,6 +104,11 @@ func (e *Engine) Send(id string, msg any) bool {
 	}
 	select {
 	case c.send <- b:
+		if m, ok := msg.(map[string]any); ok && m["type"] == "state" {
+			c.mu.Lock()
+			c.state = b
+			c.mu.Unlock()
+		}
 	default:
 		e.log.Warn("device send queue full", "device", id)
 	}
@@ -692,6 +701,29 @@ func (e *Engine) PushSource(ctx context.Context, src *store.Source) {
 	}
 }
 
+// RefreshTimes re-sends each connected board's state when time alone changed
+// what it shows. {{ @ago }}, {{ @time }} and the ago and time formatters are
+// filled in here, not on the board, so without this a board would keep showing
+// "just now" until its data changed. Run calls it every minute.
+func (e *Engine) RefreshTimes(ctx context.Context) {
+	e.mu.RLock()
+	conns := slices.Collect(maps.Values(e.conns))
+	e.mu.RUnlock()
+	for _, c := range conns {
+		state, err := e.BuildState(ctx, c.id)
+		if err != nil {
+			continue
+		}
+		b, _ := json.Marshal(state)
+		c.mu.Lock()
+		same := bytes.Equal(b, c.state)
+		c.mu.Unlock()
+		if !same {
+			e.Send(c.id, state)
+		}
+	}
+}
+
 // ---- data sources ----
 
 // Run polls HTTP sources whose interval has elapsed until ctx ends.
@@ -720,11 +752,16 @@ func (e *Engine) CloseAll() {
 func (e *Engine) Run(ctx context.Context) {
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
+	minute := time.NewTicker(time.Minute)
+	defer minute.Stop()
 	sem := make(chan struct{}, 8)
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-minute.C:
+			e.RefreshTimes(ctx)
+			continue
 		case <-t.C:
 		}
 		due, err := e.st.DueSources(ctx)

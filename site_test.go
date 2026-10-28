@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -25,6 +26,7 @@ import (
 type testSite struct {
 	t   *testing.T
 	url string
+	db  *sql.DB
 	st  *store.Store
 	eng *engine.Engine
 }
@@ -41,7 +43,7 @@ func newTestSite(t *testing.T) *testSite {
 	eng := engine.New(st, box, fetch.New(true), time.UTC, log)
 	srv := httptest.NewServer(web.New(web.Config{AllowSignup: true}, st, eng, library.New(st, eng), log).Handler())
 	t.Cleanup(srv.Close)
-	return &testSite{t: t, url: srv.URL, st: st, eng: eng}
+	return &testSite{t: t, url: srv.URL, db: db, st: st, eng: eng}
 }
 
 // browser is a new browser, signed out, with its own cookies.
