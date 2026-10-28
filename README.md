@@ -46,14 +46,14 @@ board shows.
 
 makerApp is an MCP server at `https://maker.app.rabeeta.xyz/mcp`. Connect Claude
 (Settings → Connectors → Add custom connector), Claude Code
-(`claude mcp add --transport http makerapp <url>`), Codex
-(`codex mcp add makerapp --url <url>`) or another MCP app, sign in to makerApp and
+(`claude mcp add --scope user --transport http makerapp <url>`), Codex
+(`codex mcp add makerapp --url <url>`), Cursor, VS Code, Gemini CLI or another MCP app, sign in to makerApp and
 press **Allow**, then describe the app you want. The AI sees your boards, apps and data
 sources, explores APIs, creates sources, apps and screens, and installs your apps on your
 boards. Each screen it makes comes back with checks (text that won't fit the board's
 font, paths that aren't in the data), so it fixes them before you see them. It can't see
 or add API keys (it gives you the source's link to add one), delete anything, publish, or
-install apps other people published. **AI Builder** in the top bar has the steps and the
+install apps other people published. **MCP** in the top bar has the steps for each AI app and the
 connected apps, with **Disconnect**.
 
 Under the hood: OAuth 2.1 with PKCE (client ID metadata documents or dynamic

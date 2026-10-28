@@ -23,7 +23,7 @@ export function Layout({ me, path, onSignOut, children }: { me: Me; path: string
                 <Link to="/devices" className={on('/devices', '/flash')}>Devices</Link>
                 <Link to="/apps" className={on('/apps', '/screens', '/sources')}>My apps</Link>
                 <Link to="/store" className={on('/store')}>App Store</Link>
-                <Link to="/connect" className={on('/connect')}>AI Builder</Link>
+                <Link to="/connect" className={on('/connect')}>MCP</Link>
               </nav>
               <div className="who">
                 <Link to="/account" className={['avatar', on('/account')].filter(Boolean).join(' ')} title={`${me.User.Email} · Account`} aria-label="Account">

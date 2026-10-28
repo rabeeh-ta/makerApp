@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Loading } from '../components/common'
 import { ago, useTitle } from '../lib/format'
 import { PostButton, useData } from '../lib/router'
@@ -12,71 +13,116 @@ const examples = [
   'My weather screen is blank. Fix it.',
 ]
 
-// Connect is the AI Builder: how to connect Claude, Codex and other MCP
-// apps to makerApp, and the ones connected now.
+const json = (v: unknown) => JSON.stringify(v, null, 2)
+
+// How each AI app adds makerApp, given the connector URL. None needs a key:
+// the first time it connects, it opens makerApp's sign-in and Allow page.
+const agents: { id: string; label: string; how: string; config: (url: string) => string }[] = [
+  {
+    id: 'claude-code',
+    label: 'Claude Code',
+    how: 'Run this once on your computer, then run /mcp in Claude Code and choose makerapp to sign in. It works in every project there.',
+    config: (url) => `claude mcp add --scope user --transport http makerapp ${url}`,
+  },
+  {
+    id: 'claude',
+    label: 'Claude app',
+    how: 'In Claude on the web, desktop or phone: Settings → Connectors → Add custom connector. Name it makerApp, paste this URL, then Connect, sign in here and press Allow.',
+    config: (url) => url,
+  },
+  {
+    id: 'codex',
+    label: 'Codex',
+    how: 'Run this once; Codex opens the sign-in by itself. To sign in again: codex mcp login makerapp.',
+    config: (url) => `codex mcp add makerapp --url ${url}`,
+  },
+  {
+    id: 'cursor',
+    label: 'Cursor',
+    how: 'Put this in ~/.cursor/mcp.json, or add the makerapp entry to the servers already there. Cursor asks you to sign in the first time.',
+    config: (url) => json({ mcpServers: { makerapp: { url } } }),
+  },
+  {
+    id: 'vscode',
+    label: 'VS Code',
+    how: 'Run this once; it adds makerApp to your VS Code profile for agent mode and asks you to sign in when it first connects.',
+    config: (url) => `code --add-mcp '${JSON.stringify({ name: 'makerapp', type: 'http', url })}'`,
+  },
+  {
+    id: 'gemini',
+    label: 'Gemini CLI',
+    how: 'Run this once, then /mcp auth makerapp in Gemini CLI to sign in.',
+    config: (url) => `gemini mcp add --scope user --transport http makerapp ${url}`,
+  },
+  {
+    id: 'other',
+    label: 'Other',
+    how: 'Any app that supports remote MCP servers connects to this URL and signs in through makerApp. Most take JSON like this.',
+    config: (url) => json({ mcpServers: { makerapp: { type: 'http', url } } }),
+  },
+]
+
+const agentKey = 'makerapp:mcp-agent'
+
+function remembered(): string | null {
+  try {
+    return localStorage.getItem(agentKey)
+  } catch {
+    return null
+  }
+}
+
+const copy = (text: string) => navigator.clipboard?.writeText(text).then(() => toast('Copied'), () => toast(text))
+
+// Connect is the MCP page: connect Claude, Codex or another AI app to
+// makerApp, what to ask it, and the apps connected now.
 export function Connect() {
-  useTitle('AI Builder')
+  useTitle('MCP')
   const { data, error } = useData<{ Grants: Grant[] | null; URL: string }>('/api/oauth/grants')
+  const [chosen, setChosen] = useState(remembered)
   if (!data) return <Loading error={error} />
-  const url = data.URL
   const grants = data.Grants ?? []
-  const copy = (text: string) => navigator.clipboard?.writeText(text).then(() => toast('Copied'), () => toast(text))
-  const command = (text: string) => (
-    <div className="command">
-      <pre className="json">{text}</pre>
-      <button type="button" className="btn ghost small" onClick={() => copy(text)}>
-        Copy
-      </button>
-    </div>
-  )
+  const agent = agents.find((a) => a.id === chosen) ?? agents[0]
+  const config = agent.config(data.URL)
+  function choose(id: string) {
+    setChosen(id)
+    try {
+      localStorage.setItem(agentKey, id)
+    } catch {
+      // Private windows: the choice just isn't remembered.
+    }
+  }
   return (
     <>
       <div className="page-head">
         <div>
-          <h1>AI Builder</h1>
+          <h1>MCP</h1>
           <p className="muted connect-lead">
-            Connect Claude, Codex or another AI app to makerApp over MCP, describe the app you want, and it builds it here: data sources, apps
-            and screens. It can install it on your board too.
+            Connect Claude, Codex or another AI app to makerApp, describe the app you want, and it builds it here: data sources, apps and
+            screens. It can install it on your board too.
           </p>
         </div>
       </div>
 
-      <section className="card connect-url">
-        <h3>Connector URL</h3>
-        <div className="row">
-          <input readOnly value={url} className="mono grow" onClick={(e) => e.currentTarget.select()} />
-          <button type="button" className="btn" onClick={() => copy(url)}>
+      <section className="card stack">
+        <fieldset className="seg chips">
+          <legend>Your AI app</legend>
+          {agents.map((a) => (
+            <label key={a.id}>
+              <input type="radio" name="agent" checked={agent === a} onChange={() => choose(a.id)} />
+              {a.label}
+            </label>
+          ))}
+        </fieldset>
+        <p className="muted small">{agent.how}</p>
+        <div className="command">
+          <pre className="json">{config}</pre>
+          <button type="button" className="btn ghost small" onClick={() => copy(config)}>
             Copy
           </button>
         </div>
+        <p className="muted small">No key to copy: makerApp asks you to sign in and press Allow, and you can disconnect it below.</p>
       </section>
-
-      <div className="grid two connect-steps">
-        <section className="card">
-          <h3>Claude (web, desktop, mobile)</h3>
-          <ol className="mini">
-            <li>
-              <b>Settings → Connectors → Add custom connector</b>
-            </li>
-            <li>Name it makerApp and paste the URL</li>
-            <li>Connect, log in here and press Allow</li>
-          </ol>
-        </section>
-        <section className="card">
-          <h3>Claude Code</h3>
-          {command(`claude mcp add --transport http makerapp ${url}`)}
-          <p className="muted small">Then run /mcp in Claude Code and choose makerapp to sign in.</p>
-        </section>
-        <section className="card">
-          <h3>Codex</h3>
-          {command(`codex mcp add makerapp --url ${url}`)}
-          <p className="muted small">Codex opens the sign-in by itself. To sign in again: codex mcp login makerapp</p>
-        </section>
-        <section className="card">
-          <h3>Other AI apps</h3>
-          <p className="muted small">Any app that supports MCP connectors: add a connector with the URL above. It signs in the same way.</p>
-        </section>
-      </div>
 
       <h3 className="section-title">Then ask</h3>
       <div className="card examples">
