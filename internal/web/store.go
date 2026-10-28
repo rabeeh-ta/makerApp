@@ -21,10 +21,15 @@ import (
 // listing is an app in the App Store.
 type listing struct {
 	ID, Name, Desc, By string
+	Category           string // Games or Tools (makerApp's own), or Community (published by people)
 	Installs           int
 	Preview            *webScreen
 	On                 []*store.Device // the user's devices it's installed on
 }
+
+// featured are the apps the App Store shows first, in order. Any app's ID
+// works, a published one's too.
+var featured = []string{"flappy", "pomodoro", "runner"}
 
 // listings is the App Store, most installed first. Previews show the
 // viewer's own data for personal sources, never the publisher's.
@@ -32,13 +37,16 @@ func (s *Server) listings(r *http.Request, on map[string][]*store.Device) []list
 	counts, _ := s.st.InstallCounts(r.Context())
 	var out []listing
 	for _, a := range engine.Catalog {
-		p := s.eng.CatalogPreview(a.ID)
-		out = append(out, listing{ID: a.ID, Name: a.Name, Desc: a.Desc, By: a.Publisher, Installs: counts[a.ID],
-			Preview: toWeb(p), On: on[a.ID]})
+		category := "Tools"
+		if a.Game {
+			category = "Games"
+		}
+		out = append(out, listing{ID: a.ID, Name: a.Name, Desc: a.Desc, By: a.Publisher, Category: category, Installs: counts[a.ID],
+			Preview: toWeb(s.eng.CatalogPreview(a.ID)), On: on[a.ID]})
 	}
 	published, _ := s.st.PublishedApps(r.Context())
 	for _, p := range published {
-		l := listing{ID: p.ID, Name: p.Name, Desc: p.Description, By: p.Publisher, Installs: counts[p.ID], On: on[p.ID]}
+		l := listing{ID: p.ID, Name: p.Name, Desc: p.Description, By: p.Publisher, Category: "Community", Installs: counts[p.ID], On: on[p.ID]}
 		if screens, _ := s.st.AppScreens(r.Context(), p.ID); len(screens) > 0 {
 			l.Preview = toWeb(s.eng.PreviewScreensFor(r.Context(), screens[:1], currentUser(r).ID)[0])
 		}
@@ -50,7 +58,7 @@ func (s *Server) listings(r *http.Request, on map[string][]*store.Device) []list
 
 func (s *Server) storeList(w http.ResponseWriter, r *http.Request) {
 	devices, _ := s.st.UserDevices(r.Context(), currentUser(r).ID)
-	writeJSON(w, http.StatusOK, map[string]any{"Apps": s.listings(r, s.installedOn(r, devices)), "Devices": devices})
+	writeJSON(w, http.StatusOK, map[string]any{"Apps": s.listings(r, s.installedOn(r, devices)), "Featured": featured})
 }
 
 // storeDevice is one of the viewer's boards on an app's page.

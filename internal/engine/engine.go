@@ -385,6 +385,7 @@ type CatalogApp struct {
 	Publisher      string // shown as @Publisher
 	Native         string // first firmware that has it built in; "" if none does
 	Lua            string // first firmware that downloads it as a Lua script; "" if it isn't one
+	Game           bool   // listed under Games in the App Store; the rest are Tools
 }
 
 // Makers publishes the apps made for makerApp itself.
@@ -395,23 +396,23 @@ var Catalog = []CatalogApp{
 		Desc: "Time and date from the board's own clock. Keeps ticking offline."},
 	{ID: "pomodoro", Name: "Pomodoro", Publisher: Makers, Lua: "3.1",
 		Desc: "25 minutes of focus, then a break; a long one every fourth time. Keeps counting while you use other apps."},
-	{ID: "flappy", Name: "Flappy Hog", Publisher: Makers, Native: "2.1", Lua: "3.0",
+	{ID: "flappy", Name: "Flappy Hog", Publisher: Makers, Native: "2.1", Lua: "3.0", Game: true,
 		Desc: "Flap through the pipes; any button flaps. From PostHog's DeskHog."},
-	{ID: "paddle", Name: "Paddle", Publisher: Makers, Native: "2.1", Lua: "3.0",
+	{ID: "paddle", Name: "Paddle", Publisher: Makers, Native: "2.1", Lua: "3.0", Game: true,
 		Desc: "Pong against the board, first to 5. Top and bottom move, middle starts or pauses. From PostHog's DeskHog."},
-	{ID: "runner", Name: "Hog Runner", Publisher: Makers, Native: "2.3", Lua: "3.0",
+	{ID: "runner", Name: "Hog Runner", Publisher: Makers, Native: "2.3", Lua: "3.0", Game: true,
 		Desc: "Jump the cacti, duck the birds; it keeps speeding up. Middle jumps, bottom ducks."},
-	{ID: "snake", Name: "Snake", Publisher: Makers, Native: "2.3", Lua: "3.0",
+	{ID: "snake", Name: "Snake", Publisher: Makers, Native: "2.3", Lua: "3.0", Game: true,
 		Desc: "Eat and grow without hitting a wall or your tail. Top turns left, bottom turns right, middle pauses."},
-	{ID: "breakout", Name: "Breakout", Publisher: Makers, Native: "2.3", Lua: "3.0",
+	{ID: "breakout", Name: "Breakout", Publisher: Makers, Native: "2.3", Lua: "3.0", Game: true,
 		Desc: "Clear the wall of bricks. Top and bottom move the paddle, middle launches the ball. Three lives."},
-	{ID: "whack", Name: "Whack-a-Hog", Publisher: Makers, Native: "2.3", Lua: "3.0",
+	{ID: "whack", Name: "Whack-a-Hog", Publisher: Makers, Native: "2.3", Lua: "3.0", Game: true,
 		Desc: "Hogs pop up in three rows; press that row's button before they hide. 30 seconds a round."},
-	{ID: "simon", Name: "Simon", Publisher: Makers, Native: "2.3", Lua: "3.0",
+	{ID: "simon", Name: "Simon", Publisher: Makers, Native: "2.3", Lua: "3.0", Game: true,
 		Desc: "Watch the pattern on the three pads, then repeat it. One step longer every round."},
-	{ID: "stacker", Name: "Stacker", Publisher: Makers, Native: "2.3", Lua: "3.0",
+	{ID: "stacker", Name: "Stacker", Publisher: Makers, Native: "2.3", Lua: "3.0", Game: true,
 		Desc: "Drop the sliding row onto the stack; overhangs fall off. Reach the top."},
-	{ID: "shooter", Name: "Hog Invaders", Publisher: Makers, Native: "2.3", Lua: "3.0",
+	{ID: "shooter", Name: "Hog Invaders", Publisher: Makers, Native: "2.3", Lua: "3.0", Game: true,
 		Desc: "Space Invaders on its side. Top and bottom move your ship, middle fires. Three lives."},
 }
 
