@@ -100,8 +100,10 @@ Data refreshes on each source's interval; there are no per-button actions.
 
 ### Publishing
 
-On an app's page, **Publish** puts it in the **App Store** for anyone to
-install, straight away (no review). The first time, you pick a public name; apps
+On an app's page, **Publish…** opens the publish flow: the store listing (name,
+description, setup instructions), which data people will see, a preview, then
+**Publish**. It's in the **App Store** for anyone to install straight away (no
+review); **Store listing** edits it later. The first time, you pick a public name; apps
 show as **@name**. People who install it see the app's data, fetched with your
 sources, and your edits reach their boards immediately. **Unpublish** takes it
 off the App Store and off other people's boards. Every board that has ever

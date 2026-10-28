@@ -17,6 +17,7 @@ import { Flash } from './pages/Flash'
 import { Landing } from './pages/Landing'
 import { OAuthAuthorize } from './pages/OAuthAuthorize'
 import { Pair } from './pages/Pair'
+import { Publish } from './pages/Publish'
 import { ScreenEdit } from './pages/ScreenEdit'
 import { SourceEdit } from './pages/SourceEdit'
 import { Sources } from './pages/Sources'
@@ -37,6 +38,7 @@ const routes: Route[] = [
   { re: /^\/sources\/([^/]+)$/, page: ([id]) => <SourceEdit key={id} id={id === 'new' ? '' : id} /> },
   { re: /^\/apps$/, page: (_, me) => <Apps me={me} /> },
   { re: /^\/apps\/([^/]+)$/, page: ([id]) => <AppPage id={id} /> },
+  { re: /^\/apps\/([^/]+)\/publish$/, page: ([id]) => <Publish key={id} id={id} /> },
   { re: /^\/screens\/([^/]+)$/, page: ([id]) => <ScreenEdit key={id} id={id === 'new' ? '' : id} /> },
   { re: /^\/store$/, page: () => <Store /> },
   { re: /^\/store\/([^/]+)$/, page: ([id]) => <StoreApp key={id} id={id} /> },

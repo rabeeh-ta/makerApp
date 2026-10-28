@@ -78,6 +78,13 @@ func (s *Server) loadApp(w http.ResponseWriter, r *http.Request) (*store.App, bo
 	return a, true
 }
 
+// appSource is a source an app's screens use.
+type appSource struct {
+	ID, Name   string
+	Personal   bool
+	HasExample bool
+}
+
 type deviceInstall struct {
 	*store.Device
 	Installed bool
@@ -90,17 +97,18 @@ func (s *Server) app(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	screens, _ := s.st.AppScreens(r.Context(), a.ID)
-	// Sources whose data anyone who installs the app would see, and personal
-	// ones they each send their own data to.
-	var sources, personal []string
+	// The sources its screens use, for the publish page: a shared source's
+	// data shows on the boards of everyone who installs the app; everyone
+	// sends their own to a personal one.
+	var sources []appSource
+	seen := map[string]bool{}
 	for _, sc := range screens {
-		src, err := s.st.UserSource(r.Context(), a.UserID, sc.SourceID)
-		switch {
-		case err != nil:
-		case src.PerUser && !slices.Contains(personal, src.Name):
-			personal = append(personal, src.Name)
-		case !src.PerUser && !slices.Contains(sources, src.Name):
-			sources = append(sources, src.Name)
+		if seen[sc.SourceID] {
+			continue
+		}
+		seen[sc.SourceID] = true
+		if src, err := s.st.UserSource(r.Context(), a.UserID, sc.SourceID); err == nil {
+			sources = append(sources, appSource{ID: src.ID, Name: src.Name, Personal: src.PerUser, HasExample: src.Example != ""})
 		}
 	}
 	counts, _ := s.st.InstallCounts(r.Context())
@@ -122,7 +130,6 @@ func (s *Server) app(w http.ResponseWriter, r *http.Request) {
 		"Username":  currentUser(r).Username,
 		"Installs":  counts[a.ID],
 		"Sources":   sources,
-		"Personal":  personal,
 	})
 }
 

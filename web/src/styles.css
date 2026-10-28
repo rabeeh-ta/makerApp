@@ -592,3 +592,7 @@ form.stack > .btn { align-self: flex-end; }
 .seg.chips label { position: relative; padding: 6px 12px; }
 .seg.chips input { position: absolute; opacity: 0; pointer-events: none; }
 .seg.chips label:has(:focus-visible) { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+/* Publish flow */
+.publish-flow .flow-step h3 { margin: 2px 0 0; }
+.publish-preview { display: grid; grid-template-columns: minmax(0, 300px) 1fr; gap: 16px; align-items: end; }
+@media (max-width: 860px) { .publish-preview { grid-template-columns: 1fr; } }
