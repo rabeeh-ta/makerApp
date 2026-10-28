@@ -149,7 +149,9 @@ function Banner({ apps }: { apps: Listing[] }) {
               <span className="eyebrow">Featured · {a.Category === 'Community' ? 'From the community' : a.Category.replace(/s$/, '')}</span>
               <h2>{a.Name}</h2>
               <p>{a.Desc}</p>
-              <Byline by={a.By} installs={a.Installs} />
+              <div>
+                <Byline by={a.By} installs={a.Installs} />
+              </div>
               <span className="btn store-get">{a.On?.length ? 'Installed' : 'Get'}</span>
             </div>
             <div className="store-slide-screen">{a.Preview && <DeviceScreen s={a.Preview} />}</div>

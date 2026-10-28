@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { DeviceHead, ErrorNotice, Loading, Notice } from '../components/common'
 import { Thumb } from '../components/DeviceScreen'
-import { cycleName, useTitle } from '../lib/format'
+import { cycleName, plural, useTitle } from '../lib/format'
 import { useData, useForm, useLocation } from '../lib/router'
 import type { DeviceView, Screen } from '../lib/types'
 
@@ -101,7 +101,7 @@ function Editor({ data }: { data: Data }) {
             <p className="muted small">No screens yet, so the board stays on the Apps drawer. Add some from the list.</p>
           )}
           <div className="row between">
-            <span className="muted small">{items.length ? `${items.length} screens, then it starts over.` : ''}</span>
+            <span className="muted small">{items.length ? `${plural(items.length, 'screen')}, then it starts over.` : ''}</span>
             <button className="btn" disabled={busy}>
               Save screensaver
             </button>

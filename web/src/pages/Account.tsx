@@ -1,6 +1,7 @@
 import { ErrorNotice, Loading, Notice } from '../components/common'
-import { useTitle } from '../lib/format'
+import { plural, useTitle } from '../lib/format'
 import { Link, useData, useForm, useLocation } from '../lib/router'
+import { setTheme, themes, useTheme } from '../lib/theme'
 
 type AccountData = {
   Email: string
@@ -13,14 +14,15 @@ type AccountData = {
   AIApps: number
 }
 
-// Account is the page behind the avatar: who's signed in, what the account
-// holds, and the password.
+// Account is the profile page behind the avatar: who you are and what your
+// account holds, then your details, appearance, password and connected AI apps.
 export function Account() {
   useTitle('Account')
   const { query } = useLocation()
   const { data, error, stamp } = useData<AccountData>('/api/account')
   if (!data) return <Loading error={error} />
   const since = new Date(data.CreatedAt * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+  const name = data.Username || data.Email.split('@')[0]
   const stats = [
     { to: '/devices', label: 'Devices', n: data.Devices, sub: data.Devices ? `${data.Online} online` : 'None paired yet' },
     { to: '/apps', label: 'Apps', n: data.Apps, sub: 'Made by you' },
@@ -29,28 +31,22 @@ export function Account() {
   ]
   return (
     <>
-      <div className="page-head">
-        <h1>Account</h1>
-      </div>
       {query.has('changed') && <Notice>Password changed. Any other browser signed in to this account was signed out.</Notice>}
+      <section className="card profile-head">
+        <span className="profile-avatar" aria-hidden="true">
+          {name.slice(0, 1)}
+        </span>
+        <div>
+          <h1>{data.Username ? `@${data.Username}` : name}</h1>
+          <p className="muted">{data.Email}</p>
+          <p className="muted small">
+            Member since {since}
+            {data.Username && ' · Publishes in the App Store'}
+          </p>
+        </div>
+      </section>
 
-      <div className="grid two">
-        <section className="card">
-          <h3>Profile</h3>
-          <dl className="kv">
-            <dt>Email</dt>
-            <dd>{data.Email}</dd>
-            <dt>Public name</dt>
-            <dd>{data.Username ? `@${data.Username}` : <span className="muted">Not chosen yet. You pick it when you first publish an app.</span>}</dd>
-            <dt>Member since</dt>
-            <dd>{since}</dd>
-          </dl>
-        </section>
-        <Password key={stamp} email={data.Email} />
-      </div>
-
-      <h3 className="section-title">In your account</h3>
-      <div className="grid stats">
+      <div className="grid stats profile-stats">
         {stats.map((s) => (
           <Link key={s.to} to={s.to} className="card">
             <span className="muted small">{s.label}</span>
@@ -59,7 +55,53 @@ export function Account() {
           </Link>
         ))}
       </div>
+
+      <div className="grid two">
+        <div className="stack">
+          <section className="card">
+            <h3>Account</h3>
+            <dl className="kv">
+              <dt>Email</dt>
+              <dd>{data.Email}</dd>
+              <dt>Public name</dt>
+              <dd>{data.Username ? `@${data.Username}` : <span className="muted">Not chosen yet. You pick it when you first publish an app.</span>}</dd>
+              <dt>Member since</dt>
+              <dd>{since}</dd>
+            </dl>
+          </section>
+          <Appearance />
+        </div>
+        <div className="stack">
+          <Password key={stamp} email={data.Email} />
+          <section className="card stack tight">
+            <h3>Connected AI apps</h3>
+            <p className="muted small">
+              {data.AIApps ? `${plural(data.AIApps, 'AI app')} can build apps for you over MCP.` : 'No AI app is connected.'}{' '}
+              <Link to="/connect">{data.AIApps ? 'Manage them' : 'Connect one'}</Link>
+            </p>
+          </section>
+        </div>
+      </div>
     </>
+  )
+}
+
+function Appearance() {
+  const theme = useTheme()
+  return (
+    <section className="card stack tight">
+      <h3>Appearance</h3>
+      <fieldset className="seg chips">
+        <legend className="sr-only">Theme</legend>
+        {themes.map((t) => (
+          <label key={t.value}>
+            <input type="radio" name="theme" checked={theme === t.value} onChange={() => setTheme(t.value)} />
+            {t.label}
+          </label>
+        ))}
+      </fieldset>
+      <p className="muted small">System follows your computer's light or dark setting. This browser remembers your choice.</p>
+    </section>
   )
 }
 
@@ -67,7 +109,7 @@ function Password({ email }: { email: string }) {
   const { error, busy, submit } = useForm()
   return (
     <section className="card">
-      <h3>Change password</h3>
+      <h3>Security</h3>
       <ErrorNotice error={error} />
       <form onSubmit={submit('/api/account/password')} className="stack">
         {/* Tells password managers which account the new password is for. */}
