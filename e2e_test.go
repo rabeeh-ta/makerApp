@@ -445,6 +445,16 @@ func TestDeviceFlow(t *testing.T) {
 	send(map[string]any{"type": "hello", "id": "AABBCCDDEEFF", "token": "0123456789abcdef0123", "code": "765432",
 		"fw": "2.0.0", "claim": claim.Claim})
 	recv("pair")
+	// The code stays: the minute's time refresh sends a board on no account no
+	// state, which would swap the code for the Apps drawer.
+	eng.RefreshTimes(ctx)
+	eng.Toast("AABBCCDDEEFF", "still pairing")
+	rctx, rcancel := context.WithTimeout(ctx, 5*time.Second)
+	_, next, err := dev.Read(rctx)
+	rcancel()
+	if err != nil || !strings.Contains(string(next), `"type":"toast"`) {
+		t.Fatalf("a board on no account should get no state: %s %v", next, err)
+	}
 }
 
 func mustUser(t *testing.T, st *store.Store) *store.User {

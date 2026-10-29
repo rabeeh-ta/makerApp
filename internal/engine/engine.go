@@ -606,12 +606,20 @@ func (e *Engine) StateSize(ctx context.Context, deviceID string) int {
 	return len(b)
 }
 
+// ErrUnpaired is BuildState's answer for a board on no account. Such a board
+// shows its pairing code, and any state, even an empty one, would replace the
+// code with the Apps drawer.
+var ErrUnpaired = errors.New("device is on no account")
+
 // BuildState is the "state" message a device runs: its installed apps, in
 // drawer order, plus display settings.
 func (e *Engine) BuildState(ctx context.Context, deviceID string) (map[string]any, error) {
 	dev, err := e.st.Device(ctx, deviceID)
 	if err != nil {
 		return nil, err
+	}
+	if dev.UserID == "" {
+		return nil, ErrUnpaired
 	}
 	apps := []AppView{}
 	for _, a := range e.DeviceApps(ctx, dev, false) {
@@ -768,6 +776,9 @@ func (e *Engine) PushDevice(ctx context.Context, id string) {
 		return
 	}
 	state, err := e.BuildState(ctx, id)
+	if errors.Is(err, ErrUnpaired) {
+		return
+	}
 	if err != nil {
 		e.log.Error("build state", "device", id, "err", err)
 		return
@@ -828,7 +839,8 @@ func (e *Engine) PushSource(ctx context.Context, src *store.Source) {
 // RefreshTimes re-sends each connected board's state when time alone changed
 // what it shows. {{ @ago }}, {{ @time }} and the ago and time formatters are
 // filled in here, not on the board, so without this a board would keep showing
-// "just now" until its data changed. Run calls it every minute.
+// "just now" until its data changed. Run calls it every minute. A board on no
+// account gets nothing (BuildState fails), so it keeps showing its code.
 func (e *Engine) RefreshTimes(ctx context.Context) {
 	e.mu.RLock()
 	conns := slices.Collect(maps.Values(e.conns))
