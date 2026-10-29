@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Byline, ErrorNotice, Loading } from '../components/common'
 import { Thumb } from '../components/DeviceScreen'
+import { Markdown } from '../components/Markdown'
 import { useTitle } from '../lib/format'
 import { Link, PostButton, useData, useForm } from '../lib/router'
 import type { App, Screen } from '../lib/types'
@@ -30,6 +31,8 @@ function Flow({ data }: { data: Data }) {
   const { error, busy, submit } = useForm()
   const [name, setName] = useState(data.Username)
   const [desc, setDesc] = useState(app.Description)
+  const [readme, setReadme] = useState(app.Setup)
+  const [preview, setPreview] = useState(false)
   return (
     <>
       <div className="page-head">
@@ -64,10 +67,31 @@ function Flow({ data }: { data: Data }) {
               Short description <span className="muted small">{desc.length}/140</span>
               <input name="description" required maxLength={140} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What it shows" />
             </label>
-            <label>
-              Setup instructions <span className="muted small">optional: what people do after installing it, like a script to run</span>
-              <textarea name="setup" rows={8} maxLength={4000} defaultValue={app.Setup} className="mono" />
-            </label>
+            <div className="stack readme-edit">
+              <div className="row between wrap">
+                <span className="field-label">
+                  README{' '}
+                  <span className="muted small">
+                    optional, in Markdown: what it shows and how to set it up, like a script to run · {readme.length.toLocaleString()}/20,000
+                  </span>
+                </span>
+                <div className="tabs">
+                  <button type="button" className={preview ? 'tab' : 'tab on'} onClick={() => setPreview(false)}>
+                    Write
+                  </button>
+                  <button type="button" className={preview ? 'tab on' : 'tab'} onClick={() => setPreview(true)}>
+                    Preview
+                  </button>
+                </div>
+              </div>
+              <input type="hidden" name="setup" value={readme} />
+              {preview ? (
+                <div className="readme-preview">{readme.trim() ? <Markdown text={readme} /> : <p className="muted small">Nothing to preview yet.</p>}</div>
+              ) : (
+                <textarea aria-label="README" rows={14} maxLength={20000} value={readme} onChange={(e) => setReadme(e.target.value)} className="mono"
+                  placeholder={'## Setup\n\n1. Install it on your board.\n2. Run:\n\n```sh\ncurl -d \'{"value": 1}\' {{push_url}}\n```'} />
+              )}
+            </div>
             {sources.some((s) => s.Personal) && (
               <p className="muted small">Write {'{{push_url}}'} where each person’s own push link goes; the App Store page fills it in for them.</p>
             )}

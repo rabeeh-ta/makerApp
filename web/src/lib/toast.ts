@@ -13,3 +13,6 @@ export function toast(msg: string) {
   clearTimeout(timer)
   timer = setTimeout(() => t.classList.remove('show'), 1600)
 }
+
+// copy puts text on the clipboard; where that isn't allowed, it shows the text.
+export const copy = (text: string) => navigator.clipboard?.writeText(text).then(() => toast('Copied'), () => toast(text))

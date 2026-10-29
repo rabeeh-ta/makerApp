@@ -133,8 +133,9 @@ func (s *Server) app(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// maxSetup is how long an app's setup instructions can be.
-const maxSetup = 4000
+// maxSetup is how long an app's README can be, in characters: room for a
+// short script in a code block.
+const maxSetup = 20000
 
 var usernameRe = regexp.MustCompile(`^[a-z0-9_-]{3,20}$`)
 
@@ -143,7 +144,7 @@ var reservedNames = []string{"makerinc", "makerapp", "maker", "esphog", "admin",
 
 // publishApp makes the app public right away: anyone can find and install it
 // in the App Store. The first time, the user also picks the public name it's
-// shown under. Posting again saves its description and setup instructions.
+// shown under. Posting again saves its description and README.
 func (s *Server) publishApp(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.loadApp(w, r)
 	if !ok {

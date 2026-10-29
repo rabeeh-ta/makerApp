@@ -692,7 +692,7 @@ type App struct {
 	Description string // shown in the App Store
 	PublishedAt int64  // 0 unless anyone can install it
 	MadeBy      string // the AI client that made it over MCP ("Claude"); "" if made on the website
-	Setup       string // how to set it up, shown on its App Store page
+	Setup       string // its README, in Markdown: what it shows and how to set it up, on its App Store page
 }
 
 const appCols = `id, user_id, name, cycle_sec, updated_at, created_at, description, published_at, made_by, setup`

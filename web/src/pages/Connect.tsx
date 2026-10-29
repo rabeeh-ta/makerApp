@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Loading } from '../components/common'
 import { ago, useTitle } from '../lib/format'
 import { PostButton, useData } from '../lib/router'
-import { toast } from '../lib/toast'
+import { copy } from '../lib/toast'
 
 type Grant = { ID: string; ClientName: string; CreatedAt: number; LastUsedAt: number }
 
@@ -71,8 +71,6 @@ function remembered(): string | null {
     return null
   }
 }
-
-const copy = (text: string) => navigator.clipboard?.writeText(text).then(() => toast('Copied'), () => toast(text))
 
 // Connect is the MCP page: connect Claude, Codex or another AI app to
 // makerApp, what to ask it, and the apps connected now.

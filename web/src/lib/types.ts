@@ -67,7 +67,7 @@ export type App = {
   Description: string
   PublishedAt: number
   MadeBy: string // the AI app that made it, "" if made here
-  Setup: string // how to set it up, shown on its App Store page
+  Setup: string // its README, in Markdown: what it shows and how to set it up, on its App Store page
 }
 
 export type StoredScreen = {

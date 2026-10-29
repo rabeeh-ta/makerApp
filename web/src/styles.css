@@ -585,7 +585,34 @@ form.stack > .btn { align-self: flex-end; }
 
 /* ===== App Store ===== */
 .store-desc { margin: 6px 0 0; max-width: 60ch; }
-.setup-text { white-space: pre-wrap; word-break: break-word; }
+/* An app's README (components/Markdown.tsx), and its editor on the Publish page. */
+.markdown { font-size: 14px; overflow-wrap: anywhere; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown h1, .markdown h2, .markdown h3, .markdown h4 { margin: 20px 0 8px; line-height: 1.25; letter-spacing: -0.01em; color: var(--ink); text-transform: none; }
+.markdown h1 { font-size: 22px; }
+.markdown h2 { font-size: 18px; }
+.markdown h3 { font-size: 16px; }
+.markdown h4 { font-size: 14px; }
+.markdown ul, .markdown ol { margin: 0 0 12px; padding-left: 22px; }
+.markdown li { margin: 3px 0; }
+.markdown li > p { margin: 0; }
+.markdown a { color: var(--accent); }
+.markdown blockquote { margin: 0 0 12px; padding: 2px 14px; border-left: 3px solid var(--line); color: var(--muted); }
+.markdown hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+.markdown img { max-width: 100%; border-radius: 8px; }
+.markdown table { border-collapse: collapse; margin: 0 0 12px; display: block; overflow-x: auto; }
+.markdown th, .markdown td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
+.markdown .command { margin: 0 0 12px; }
+.markdown pre { flex: 1; min-width: 0; margin: 0; background: #121211; color: #e5e3dc; padding: 12px 14px; border-radius: 8px; overflow: auto; max-height: 420px; font: 12px/1.5 var(--mono); }
+.markdown pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+.markdown .contains-task-list { padding-left: 4px; list-style: none; }
+.markdown .task-list-item input { width: auto; margin: 0 6px 0 0; }
+.field-label { font-size: 13px; font-weight: 600; }
+.field-label .muted { font-weight: 400; }
+.readme-edit { gap: 6px; }
+.readme-edit .tabs { margin: 0; }
+.readme-preview { border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-height: 120px; }
 .stack.tight { gap: 6px; }
 .after-grid { margin: 20px 0 0; }
 .stack.tight p { margin: 0; }

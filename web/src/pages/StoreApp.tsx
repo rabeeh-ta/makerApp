@@ -1,8 +1,9 @@
 import { Byline, Loading, Notice } from '../components/common'
 import { DeviceScreen } from '../components/DeviceScreen'
+import { Markdown } from '../components/Markdown'
 import { ago, useTitle } from '../lib/format'
 import { Link, PostButton, useData } from '../lib/router'
-import { toast } from '../lib/toast'
+import { copy } from '../lib/toast'
 import type { Device, Screen } from '../lib/types'
 
 type Page = {
@@ -15,16 +16,14 @@ type Page = {
   Devices: (Device & { Installed: boolean; NeedsFW: string })[] | null
   Mine?: boolean
   Public?: boolean
-  Setup?: string
+  Setup?: string // the README, with the viewer's push link filled in
   NeedsData?: string[] | null // personal sources, before installing
   Personal?: { Name: string; PushURL: string; LastFetchedAt: number; Data: string }[] | null
 }
 
-const copy = (text: string) => navigator.clipboard?.writeText(text).then(() => toast('Copied'), () => toast(text))
-
-// StoreApp is an app's page in the App Store: its screens, installing it on
-// your boards, and setting it up. Apps that show your own data give you your
-// own push link here.
+// StoreApp is an app's page in the App Store: its screens and README,
+// installing it on your boards, and setting it up. Apps that show your own
+// data give you your own push link here.
 export function StoreApp({ id }: { id: string }) {
   const { data, error } = useData<Page>(`/api/store/${id}`)
   useTitle(data?.Name)
@@ -55,15 +54,23 @@ export function StoreApp({ id }: { id: string }) {
       {data.Mine && !data.Public && <Notice>Only you can see this page until you publish the app.</Notice>}
 
       <div className="grid two wide-left">
-        <section className="grid cards">
-          {(data.Screens ?? []).map((s, i) => (
-            <div className="card" key={s.id ?? i}>
-              <div className="device-thumb">
-                <DeviceScreen s={s} />
+        <div className="stack">
+          <section className="grid cards">
+            {(data.Screens ?? []).map((s, i) => (
+              <div className="card" key={s.id ?? i}>
+                <div className="device-thumb">
+                  <DeviceScreen s={s} />
+                </div>
               </div>
-            </div>
-          ))}
-        </section>
+            ))}
+          </section>
+          {data.Setup && (
+            <section className="card">
+              <h3>README</h3>
+              <Markdown text={data.Setup} />
+            </section>
+          )}
+        </div>
 
         <aside className="stack">
           <section className="card">
@@ -93,7 +100,7 @@ export function StoreApp({ id }: { id: string }) {
             )}
           </section>
 
-          {(data.Setup || needs.length > 0 || personal.length > 0) && (
+          {(needs.length > 0 || personal.length > 0) && (
             <section className="card stack">
               <h3>Setup</h3>
               {needs.length > 0 && (
@@ -124,14 +131,6 @@ export function StoreApp({ id }: { id: string }) {
                   )}
                 </div>
               ))}
-              {data.Setup && (
-                <div className="command">
-                  <pre className="json setup-text">{data.Setup}</pre>
-                  <button type="button" className="btn ghost small" onClick={() => copy(data.Setup ?? '')}>
-                    Copy
-                  </button>
-                </div>
-              )}
             </section>
           )}
         </aside>

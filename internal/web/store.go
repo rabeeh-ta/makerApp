@@ -75,7 +75,7 @@ type personalLink struct {
 	Data          string // the latest data, pretty and trimmed
 }
 
-// pushURLMarker in an app's setup instructions becomes the viewer's push link.
+// pushURLMarker in an app's README becomes the viewer's push link.
 const pushURLMarker = "{{push_url}}"
 
 // storeApp is an app's App Store page. Viewers who installed the app (and its
