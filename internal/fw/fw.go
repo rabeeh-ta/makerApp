@@ -88,10 +88,16 @@ type manifestBuild struct {
 
 // Manifest builds the ESP Web Tools manifest. configPath points at the
 // device-specific config image so each flash carries its own claim token.
+//
+// The version never equals the one a board reports. On a board that already
+// runs this firmware, ESP Web Tools would otherwise offer only "Erase User
+// Data", and erasing loses the board's secret, which a board changing hands
+// needs to prove it's the same board (engine.admit). This way it offers
+// "Update", which keeps it.
 func Manifest(configPath string) []byte {
 	m := map[string]any{
 		"name":                         "makerDevice",
-		"version":                      Version(),
+		"version":                      Version() + " for your account",
 		"new_install_prompt_erase":     true,
 		"new_install_improv_wait_time": 20,
 		"builds": []manifestBuild{{

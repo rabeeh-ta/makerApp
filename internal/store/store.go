@@ -307,10 +307,23 @@ func (s *Store) TouchDevice(ctx context.Context, id string) error {
 	return err
 }
 
+// ClaimDeviceFor makes userID the device's owner. Other accounts' claims on it
+// are dropped: one still on the board from an earlier install would otherwise
+// take it back (engine.admit hands a board to the account whose claim it sends).
 func (s *Store) ClaimDeviceFor(ctx context.Context, id, userID, name string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE devices SET user_id = ?, name = CASE WHEN name = '' THEN ? ELSE name END WHERE id = ?`,
-		userID, name, id)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE devices SET user_id = ?, name = CASE WHEN name = '' THEN ? ELSE name END WHERE id = ?`,
+		userID, name, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM claims WHERE device_id = ? AND user_id != ?`, id, userID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 type DeviceSettings struct {
