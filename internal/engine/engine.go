@@ -311,6 +311,9 @@ func (e *Engine) pingLoop(ctx context.Context, cancel context.CancelFunc, c *con
 // A device proves itself with the secret it generated on first boot (trust on
 // first use). A claimed device with a different secret is refused, unless it
 // also carries a claim token from its owner (it was re-flashed from the site).
+// One carrying another account's claim was re-flashed by someone else: it's
+// refused too, rather than showing its owner's apps, and joins the new
+// account once the owner removes it.
 func (e *Engine) admit(ctx context.Context, h *hello) ([]any, error) {
 	existing, err := e.st.Device(ctx, h.ID)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
@@ -320,10 +323,9 @@ func (e *Engine) admit(ctx context.Context, h *hello) ([]any, error) {
 	if h.Claim != "" {
 		claimOwner, _ = e.st.UseClaim(ctx, h.Claim, h.ID)
 	}
-	if existing != nil && existing.UserID != "" && existing.TokenHash != store.HashToken(h.Token) {
-		if claimOwner != existing.UserID {
-			return nil, errors.New("Registered to another account. Remove it there, then retry.")
-		}
+	if existing != nil && existing.UserID != "" && claimOwner != existing.UserID &&
+		(claimOwner != "" || existing.TokenHash != store.HashToken(h.Token)) {
+		return nil, errors.New("Registered to another account. Remove it there, then retry.")
 	}
 	d := &store.Device{ID: h.ID, TokenHash: store.HashToken(h.Token), PairCode: h.Code, FWVersion: h.FW,
 		Board: h.Board, IP: h.IP, RSSI: h.RSSI}

@@ -401,6 +401,46 @@ func TestDeviceFlow(t *testing.T) {
 		t.Fatalf("impostor not rejected: %s", reply)
 	}
 	evil.CloseNow()
+
+	// A board on this account, re-flashed from another account without erasing
+	// it (same secret), is refused rather than shown this account's apps. Once
+	// it's removed here, it joins the other account.
+	friend, err := st.CreateUser(ctx, "friend@example.com", "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	friendClaim, _ := st.CreateClaim(ctx, friend.ID, time.Hour)
+	reflashed := func() string {
+		t.Helper()
+		c, _, err := websocket.Dial(ctx, wsURL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer c.CloseNow()
+		b, _ := json.Marshal(map[string]any{"type": "hello", "id": "112233445566", "token": "fedcba9876543210fedc",
+			"code": "333444", "fw": "3.1.0", "claim": friendClaim})
+		_ = c.Write(ctx, websocket.MessageText, b)
+		_, reply, _ := c.Read(ctx)
+		return string(reply)
+	}
+	if reply := reflashed(); !strings.Contains(reply, `"error"`) {
+		t.Fatalf("a board re-flashed by another account should be refused: %s", reply)
+	}
+	post("/api/devices/112233445566/do/forget", url.Values{})
+	if reply := reflashed(); !strings.Contains(reply, `"type":"state"`) {
+		t.Fatalf("once removed, the re-flashed board should join the other account: %s", reply)
+	}
+	if d, _ := st.Device(ctx, "112233445566"); d.UserID != friend.ID {
+		t.Fatalf("board owner %q, want the account that re-flashed it", d.UserID)
+	}
+
+	// Removing a board flashed from this account makes it show a pairing code;
+	// the claim it still carries doesn't add it back.
+	post("/api/devices/AABBCCDDEEFF/do/forget", url.Values{})
+	recv("unpaired")
+	send(map[string]any{"type": "hello", "id": "AABBCCDDEEFF", "token": "0123456789abcdef0123", "code": "765432",
+		"fw": "2.0.0", "claim": claim.Claim})
+	recv("pair")
 }
 
 func mustUser(t *testing.T, st *store.Store) *store.User {

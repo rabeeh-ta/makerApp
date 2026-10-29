@@ -31,6 +31,7 @@ const char PAGE_HEAD[] PROGMEM = R"(<!doctype html><html><head><meta charset="ut
 <style>body{font-family:system-ui,sans-serif;max-width:420px;margin:32px auto;padding:0 16px;background:#111;color:#eee}
 h1{color:#F54E00;font-size:22px}label{display:block;margin:14px 0 6px;font-size:14px;color:#aaa}
 input,select{width:100%;padding:12px;border-radius:8px;border:1px solid #333;background:#1b1b1b;color:#eee;font-size:16px;box-sizing:border-box}
+.show{display:flex;align-items:center;gap:8px}.show input{width:auto;margin:0}
 button{margin-top:20px;width:100%;padding:14px;border:0;border-radius:8px;background:#F54E00;color:#fff;font-size:16px;font-weight:600}
 p{color:#aaa;font-size:14px}</style></head><body><h1>makerDevice WiFi setup</h1>)";
 
@@ -58,7 +59,11 @@ void handleRoot() {
   page += "<label>Network</label><select onchange=\"document.getElementById('s').value=this.value\">";
   page += "<option value=''>Choose a network...</option>" + networksHtml + "</select>";
   page += "<label>Network name (SSID)</label><input id='s' name='ssid' required>";
-  page += "<label>Password</label><input name='pass' type='password'>";
+  // Phones capitalize and autocorrect a shown password unless told not to.
+  page += "<label>Password</label><input id='p' name='pass' type='password' autocapitalize='off' autocorrect='off' "
+          "spellcheck='false'>";
+  page += "<label class='show'><input type='checkbox' "
+          "onchange=\"document.getElementById('p').type=this.checked?'text':'password'\">Show password</label>";
   page += "<button>Save and connect</button></form></body></html>";
   server.send(200, "text/html", page);
 }

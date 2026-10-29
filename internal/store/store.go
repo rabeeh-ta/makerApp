@@ -326,7 +326,9 @@ func (s *Store) UpdateDeviceSettings(ctx context.Context, userID, id string, d D
 	return err
 }
 
-// ForgetDevice releases the device so it can be paired again.
+// ForgetDevice releases the device so it can be paired again. The claim it was
+// flashed with goes too: the board keeps sending it, and it would rejoin this
+// account instead of showing a pairing code.
 func (s *Store) ForgetDevice(ctx context.Context, userID, id string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -337,6 +339,9 @@ func (s *Store) ForgetDevice(ctx context.Context, userID, id string) error {
 		if _, err := tx.ExecContext(ctx, q, id); err != nil {
 			return err
 		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM claims WHERE device_id = ? AND user_id = ?`, id, userID); err != nil {
+		return err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE devices SET user_id = NULL, name = '', brightness = 100
 		WHERE id = ? AND user_id = ?`, id, userID); err != nil {
