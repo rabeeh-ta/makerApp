@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
-# Claude Stats for makerApp: a Claude Code status line that also sends your
-# Claude usage to your makerDevice. Prints "Opus 5.5 · session 37% · week 12%"
-# and posts the numbers to your push link when they change (or every 2
-# minutes). Every 15 minutes it also starts itself with --stats in the
-# background, which totals your Claude Code transcripts (sessions, tokens,
-# streaks) for the stats screens; the next post carries them.
+# Claude Stats for makerApp: shows your Claude Code stats on your makerDevice.
 #
-# Set it as Claude Code's status line in ~/.claude/settings.json, with your
-# push link from the app's App Store page:
-#   "statusLine": {"type": "command", "command": "python3 ~/.claude/claude-stats.py YOUR_PUSH_LINK"}
-import glob, json, os, subprocess, sys, time
+# It reads the history Claude Code keeps in ~/.claude/projects, takes only
+# token counts, models and times from it (never what you or Claude wrote), and
+# sends totals to your push link: favorite model, tokens, sessions, streaks and
+# tokens per day. It only reads: Claude Code and its settings stay as they are.
+# The one file it writes is a cache, ~/.cache/makerapp-claude-stats.json, so
+# it doesn't reread old history every time.
+#
+#   python3 claude-stats.py YOUR_PUSH_LINK           send once
+#   python3 claude-stats.py YOUR_PUSH_LINK --watch   send every 5 minutes until you stop it (Ctrl-C)
+import glob, json, os, sys, time, urllib.request
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-PUSH_URL = next((a for a in sys.argv[1:] if a != "--stats"), "")  # without one it is only a status line
 HOME = os.path.expanduser("~/.claude")
-LAST = os.path.join(HOME, "makerapp-usage.last")
-STATS = os.path.join(HOME, "makerapp-stats.json")
-CACHE = os.path.join(HOME, "makerapp-stats-cache.json")
+CACHE = os.path.expanduser("~/.cache/makerapp-claude-stats.json")
+EVERY = 300  # seconds between sends with --watch
 
 
 def model_name(m):
@@ -115,51 +114,35 @@ def compute_stats():
     return {"items": [{"label": a, "value": b} for a, b in items], "days": last30, "tokens_30d": sum(last30)}
 
 
-if "--stats" in sys.argv[1:]:
-    stats = compute_stats()
-    if stats:
-        json.dump(stats, open(STATS + ".tmp", "w"))
-        os.replace(STATS + ".tmp", STATS)
-    sys.exit()
-
-data = json.load(sys.stdin)
-limits = data.get("rate_limits") or {}
+def send(url, stats):
+    body = json.dumps({"stats": stats}).encode()
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+    urllib.request.urlopen(req, timeout=10).close()
 
 
-def window(key, fmt):
-    w = limits.get(key) or {}
-    if w.get("used_percentage") is None:
-        return None
-    resets = datetime.fromtimestamp(w["resets_at"]).strftime(fmt).replace(" 0", " ").lstrip("0") if w.get("resets_at") else ""
-    return {"used": round(w["used_percentage"]), "resets": resets}
+def main():
+    args = sys.argv[1:]
+    url = next((a for a in args if not a.startswith("--")), "")
+    if not url.startswith(("https://", "http://")):
+        sys.exit("Usage: python3 claude-stats.py YOUR_PUSH_LINK [--watch]\nYour push link is on the app's App Store page.")
+    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+    while True:
+        stats = compute_stats()
+        if not stats:
+            print("No Claude Code history in ~/.claude/projects yet.", flush=True)
+        else:
+            try:
+                send(url, stats)
+                print(time.strftime("%H:%M"), "sent:", ", ".join(f"{i['label']} {i['value']}" for i in stats["items"][:3]), flush=True)
+            except OSError as e:
+                print(time.strftime("%H:%M"), "couldn't send:", e, flush=True)
+        if "--watch" not in args:
+            return
+        time.sleep(EVERY)
 
 
-session, week = window("five_hour", "%I:%M %p"), window("seven_day", "%a %I:%M %p")
-parts = [(data.get("model") or {}).get("display_name", "Claude")]
-parts += [f"{name} {w['used']}%" for name, w in (("session", session), ("week", week)) if w]
-print(" · ".join(parts))
-
-quiet = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL, "start_new_session": True}
-try:
-    stats_age = time.time() - os.path.getmtime(STATS)
-except OSError:
-    stats_age = float("inf")
-if stats_age > 900:
-    open(STATS, "a").close()
-    os.utime(STATS)  # so the next refresh doesn't start another while this one runs
-    subprocess.Popen([sys.executable, os.path.abspath(__file__), "--stats"], **quiet)
-
-try:
-    stats = json.load(open(STATS))
-except (OSError, ValueError):
-    stats = None
-if PUSH_URL and (session or week or stats):  # plans without session limits still send their stats
-    payload = json.dumps({"session": session, "week": week, "stats": stats})
+if __name__ == "__main__":
     try:
-        stamp, _, sent = open(LAST).read().partition("\n")
-    except OSError:
-        stamp, sent = "0", ""
-    if payload != sent or time.time() - float(stamp or 0) > 120:
-        with open(LAST, "w") as f:
-            f.write(f"{time.time()}\n{payload}")
-        subprocess.Popen(["curl", "-s", "-m", "10", "-H", "Content-Type: application/json", "-d", payload, PUSH_URL], **quiet)
+        main()
+    except KeyboardInterrupt:
+        pass
