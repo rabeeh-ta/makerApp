@@ -39,7 +39,7 @@ type Spec struct {
 	SeriesPath string `json:"series_path"`
 	PctValue   string `json:"pct_value"`
 	PctMax     string `json:"pct_max"`
-	GIF        string `json:"gif"` // the hash of an uploaded animation (internal/anim)
+	GIF        string `json:"gif,omitempty"` // the hash of an uploaded animation (internal/anim)
 }
 
 func DefaultSpec(layout string) Spec {
