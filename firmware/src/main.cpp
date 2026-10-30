@@ -58,6 +58,7 @@ uint32_t lastSettingsDraw = 0;  // Settings shows live signal strength and memor
 int settingsPage = 0;           // 0 WiFi, 1 Storage
 uint32_t lastCycle = 0;         // last automatic page turn (in an app, or the screensaver)
 int saverPage = 0;              // page of the screensaver on screen
+uint32_t pageHold = 0;          // seconds this page stays up, when it says so itself (a GIF in the GIFs app)
 int holdLeft = 0;               // seconds of D1 hold left before WiFi reset, shown in Settings
 bool dirty = true;
 
@@ -334,6 +335,7 @@ void renderApp(JsonObjectConst app) {
   }
   page = constrain(page, 0, (int)pages.size() - 1);
   JsonObjectConst screen = pages[page].screen;
+  pageHold = screen["hold"] | 0;
   String layout = screen["layout"] | "";
   if (isGameLayout(layout)) {
     shownGame = true;
@@ -755,7 +757,7 @@ void tick() {
   }
   if (view == View::App) {
     JsonObjectConst app = currentApp();
-    uint32_t cycle = (uint32_t)(app["cycle"] | 0) * 1000;
+    uint32_t cycle = (pageHold ? pageHold : (uint32_t)(app["cycle"] | 0)) * 1000;
     if (cycle && now - lastInteraction > cycle && now - lastCycle > cycle) {
       lastCycle = now;
       int n = appPages(app).size();

@@ -73,6 +73,7 @@ type Screen struct {
 	Game     string      `json:"game,omitempty"` // layout "game": the Lua game to run
 	Hash     string      `json:"hash,omitempty"` // and its version, which the board downloads
 	GIF      string      `json:"gif,omitempty"`  // layout "gif": the animation the board downloads
+	Hold     int         `json:"hold,omitempty"` // seconds before turning to the next screen, instead of the app's cycle
 	Error    string      `json:"-"`              // source error, shown in the web UI only
 }
 

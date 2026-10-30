@@ -1,5 +1,6 @@
 import { Byline, Loading, Notice } from '../components/common'
 import { DeviceScreen } from '../components/DeviceScreen'
+import { GifManager } from '../components/GifManager'
 import { Markdown } from '../components/Markdown'
 import { ago, useTitle } from '../lib/format'
 import { Link, PostButton, useData } from '../lib/router'
@@ -55,6 +56,7 @@ export function StoreApp({ id }: { id: string }) {
 
       <div className="grid two wide-left">
         <div className="stack">
+          {data.ID === 'gifs' && <GifManager />}
           <section className="grid cards">
             {(data.Screens ?? []).map((s, i) => (
               <div className="card" key={s.id ?? i}>

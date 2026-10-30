@@ -400,6 +400,9 @@ type CatalogApp struct {
 	Game           bool   // listed under Games in the App Store; the rest are Tools
 }
 
+// GIFsApp is the catalog app that plays each person's own GIFs.
+const GIFsApp = "gifs"
+
 // Makers publishes the apps made for makerApp itself.
 const Makers = "makerInc"
 
@@ -408,6 +411,8 @@ var Catalog = []CatalogApp{
 		Desc: "Time and date from the board's own clock. Keeps ticking offline."},
 	{ID: "pomodoro", Name: "Pomodoro", Publisher: Makers, Lua: "3.1",
 		Desc: "25 minutes of focus, then a break; a long one every fourth time. Keeps counting while you use other apps."},
+	{ID: GIFsApp, Name: "GIFs", Publisher: Makers, Native: "3.4",
+		Desc: "Your own GIFs on your board. Upload a few, put them in order and choose how long each one plays."},
 	{ID: "flappy", Name: "Flappy Hog", Publisher: Makers, Native: "2.1", Lua: "3.0", Game: true,
 		Desc: "Flap through the pipes; any button flaps. From PostHog's DeskHog."},
 	{ID: "paddle", Name: "Paddle", Publisher: Makers, Native: "2.1", Lua: "3.0", Game: true,
@@ -486,6 +491,11 @@ func (e *Engine) DeviceApps(ctx context.Context, dev *store.Device, preview bool
 	cache := map[string]*store.Source{}
 	out := []AppView{}
 	for _, id := range ids {
+		if id == GIFsApp {
+			c, _ := CatalogEntry(id)
+			out = append(out, AppView{ID: c.ID, Name: c.Name, Catalog: true, By: c.Publisher, Screens: e.GIFScreens(ctx, dev.UserID)})
+			continue
+		}
 		if c, ok := CatalogEntry(id); ok {
 			sc := c.deviceScreen(dev.FWVersion)
 			if preview {
@@ -507,6 +517,27 @@ func (e *Engine) DeviceApps(ctx context.Context, dev *store.Device, preview bool
 		out = append(out, v)
 	}
 	return out
+}
+
+// GIFScreens are the screens of a person's GIFs app, one a GIF.
+func (e *Engine) GIFScreens(ctx context.Context, userID string) []render.Screen {
+	items, _ := e.st.GIFPlaylist(ctx, userID)
+	out := []render.Screen{}
+	for _, it := range items {
+		out = append(out, render.Screen{ID: it.Hash, Name: it.Name, Layout: "gif", Title: render.ASCII(it.Name), GIF: it.Hash, Hold: it.Hold})
+	}
+	return out
+}
+
+// PushGIFs sends a person's boards their GIFs app after it changed.
+func (e *Engine) PushGIFs(ctx context.Context, userID string) {
+	on, _ := e.st.DevicesWithApp(ctx, GIFsApp)
+	devices, _ := e.st.UserDevices(ctx, userID)
+	for _, d := range devices {
+		if slices.Contains(on, d.ID) {
+			e.PushDevice(ctx, d.ID)
+		}
+	}
 }
 
 // ---- rendering & pushing ----

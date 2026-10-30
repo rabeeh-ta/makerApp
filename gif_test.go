@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +39,7 @@ func TestScreensRebuildKeepsRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	last := len(migrations) - 1
+	last := slices.IndexFunc(migrations, func(m string) bool { return strings.Contains(m, "screens_new") })
 	for _, m := range migrations[:last] {
 		if _, err := db.Exec(m); err != nil {
 			t.Fatal(err)
@@ -154,6 +156,63 @@ func TestGIFScreen(t *testing.T) {
 	}
 	if preview.Layout != "gif" || preview.GIF != hash {
 		t.Fatalf("preview: %+v", preview)
+	}
+
+	// The GIFs app: added to the list, with a time and an order, and on the board's screens.
+	addGIF := func(content []byte, filename string) (int, []byte) {
+		t.Helper()
+		var body bytes.Buffer
+		mw := multipart.NewWriter(&body)
+		w, _ := mw.CreateFormFile("file", filename)
+		w.Write(content)
+		mw.Close()
+		resp, err := client.Post(srv.URL+"/api/gifs", mw.FormDataContentType(), &body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, b
+	}
+	if code, b := addGIF(picture.Bytes(), "itachi eyes.gif"); code != 200 {
+		t.Fatalf("add: %d %s", code, b)
+	}
+	if code, _ := addGIF(picture.Bytes(), "again.gif"); code != http.StatusBadRequest {
+		t.Fatalf("the same GIF twice: %d, want 400", code)
+	}
+	g.Image[0].Pix[5] = 1
+	var other bytes.Buffer
+	if err := gif.EncodeAll(&other, g); err != nil {
+		t.Fatal(err)
+	}
+	code, b := addGIF(other.Bytes(), "second.gif")
+	if code != 200 {
+		t.Fatalf("add second: %d %s", code, b)
+	}
+	var list struct {
+		Items []struct {
+			Hash, Name  string
+			Hold, Bytes int
+		}
+	}
+	if err := json.Unmarshal(b, &list); err != nil || len(list.Items) != 2 || list.Items[0].Name != "itachi eyes" || list.Items[0].Hold != 10 || list.Items[0].Bytes == 0 {
+		t.Fatalf("list: %v %+v", err, list)
+	}
+	first, second := list.Items[0].Hash, list.Items[1].Hash
+	// Reordered, one time out of range, and a hash that was never uploaded: it can't get in.
+	order := fmt.Sprintf(`[{"Hash":%q,"Hold":1},{"Hash":"aaaaaaaaaaaa","Hold":5},{"Hash":%q,"Hold":45}]`, second, first)
+	resp, err = client.PostForm(srv.URL+"/api/gifs/save", url.Values{"items": {order}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	var userID string
+	if err := db.QueryRow(`SELECT id FROM users`).Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+	shown := eng.GIFScreens(context.Background(), userID)
+	if len(shown) != 2 || shown[0].GIF != second || shown[0].Hold != 2 || shown[1].GIF != first || shown[1].Hold != 45 || shown[0].Layout != "gif" {
+		t.Fatalf("on the board: %+v", shown)
 	}
 
 	// Saved as a real screen too: the database has to accept the layout.

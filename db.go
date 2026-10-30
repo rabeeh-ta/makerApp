@@ -211,6 +211,11 @@ var migrations = []string{
 	ALTER TABLE screens_new RENAME TO screens;
 	CREATE INDEX idx_screens_source ON screens(source_id);
 	CREATE INDEX idx_screens_app ON screens(app_id);`,
+	// The GIFs app: what each person plays on their boards, as JSON, in order.
+	`CREATE TABLE gif_playlists (
+		user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+		items TEXT NOT NULL DEFAULT '[]'
+	)`,
 }
 
 func migrate(db *sql.DB) error {

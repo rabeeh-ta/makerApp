@@ -251,6 +251,16 @@ pre.json { background: #121211; color: #e5e3dc; padding: 14px; border-radius: 8p
 .lcd-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lcd-row b { color: var(--accent); white-space: nowrap; }
 .lcd-text { position: absolute; left: 8px; right: 12px; top: 32px; font-size: 12.5px; line-height: 19px; white-space: pre-wrap; overflow: hidden; height: 98px; }
+.lcd-art-gifs i { position: absolute; left: 62px; top: 50px; width: 0; height: 0; border-style: solid; border-width: 18px 0 18px 30px; border-color: transparent transparent transparent #f54e00; }
+.lcd-art-gifs span { position: absolute; left: 104px; top: 46px; color: #fff; font-size: 36px; line-height: 44px; font-weight: 700; }
+.gif-meter { height: 6px; border-radius: 3px; background: var(--line, #333); overflow: hidden; }
+.gif-meter i { display: block; height: 100%; background: #f54e00; }
+.gif-rows { display: flex; flex-direction: column; gap: 10px; list-style: none; margin: 0; padding: 0; }
+.gif-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gif-row img { width: 96px; height: 54px; object-fit: cover; image-rendering: pixelated; border-radius: 4px; background: #000; flex: none; }
+.gif-row .gif-name { flex: 1 1 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.gif-hold { flex-direction: row; align-items: center; font-weight: 400; }
+.gif-hold input[type='number'] { width: 72px; }
 .lcd-gif { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
 .lcd-spark { position: absolute; left: 8px; right: 8px; bottom: 6px; height: 64px; width: 224px; overflow: visible; }
 .lcd-spark polyline { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }

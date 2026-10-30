@@ -943,3 +943,41 @@ func (s *Store) UserAnimationCount(ctx context.Context, userID string) (int, err
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM animations WHERE user_id = ?`, userID).Scan(&n)
 	return n, err
 }
+
+// GIFItem is one GIF in a person's GIFs app.
+type GIFItem struct {
+	Hash string
+	Name string
+	Hold int // seconds on screen before the next one
+}
+
+// GIFPlaylist is what a person's GIFs app plays, in order.
+func (s *Store) GIFPlaylist(ctx context.Context, userID string) ([]GIFItem, error) {
+	var raw string
+	err := s.db.QueryRowContext(ctx, `SELECT items FROM gif_playlists WHERE user_id = ?`, userID).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return []GIFItem{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	items := []GIFItem{}
+	return items, json.Unmarshal([]byte(raw), &items)
+}
+
+func (s *Store) SaveGIFPlaylist(ctx context.Context, userID string, items []GIFItem) error {
+	raw, err := json.Marshal(items)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO gif_playlists (user_id, items) VALUES (?, ?)
+		ON CONFLICT(user_id) DO UPDATE SET items = excluded.items`, userID, string(raw))
+	return err
+}
+
+// AnimationSize is how many bytes a converted GIF takes on a board; 0 if there's none.
+func (s *Store) AnimationSize(ctx context.Context, hash string) int {
+	var n int
+	_ = s.db.QueryRowContext(ctx, `SELECT length(data) FROM animations WHERE hash = ?`, hash).Scan(&n)
+	return n
+}

@@ -99,6 +99,12 @@ const holes = (top: number) => [35, 105, 175].map((x) => <i className="hole" key
 
 // Still frames of the catalog's Lua apps, keyed by app ID (their preview's layout).
 const appArt: Record<string, React.ReactNode> = {
+  gifs: (
+    <div className="lcd-art lcd-art-gifs">
+      <i />
+      <span>GIF</span>
+    </div>
+  ),
   pomodoro: (
     <div className="lcd-art">
       <span className="art-score" style={{ color: '#f54e00', textShadow: 'none' }}>Focus</span>
