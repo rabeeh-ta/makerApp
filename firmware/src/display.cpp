@@ -103,9 +103,7 @@ std::vector<String> wrap(const String& s, const GFXfont* f, int maxW) {
   return lines;
 }
 
-void header(const String& title, uint16_t accent, int index, int count) {
-  int dotsW = (count > 1 ? count * 9 : 0) + (offline ? 12 : 0);
-  text(8, 19, ellipsize(title, &FreeSansBold9pt7b, W - 20 - dotsW), &FreeSansBold9pt7b, accent);
+void cornerDots(uint16_t accent, int index, int count) {
   int right = W - 8;
   if (offline) {
     canvas->fillCircle(right, 13, 3, 0xF8A2);  // red: not connected to the server
@@ -120,6 +118,12 @@ void header(const String& title, uint16_t accent, int index, int count) {
         canvas->drawCircle(cx, 13, 3, GRAY);
     }
   }
+}
+
+void header(const String& title, uint16_t accent, int index, int count) {
+  int dotsW = (count > 1 ? count * 9 : 0) + (offline ? 12 : 0);
+  text(8, 19, ellipsize(title, &FreeSansBold9pt7b, W - 20 - dotsW), &FreeSansBold9pt7b, accent);
+  cornerDots(accent, index, count);
 }
 
 const GFXfont* fontFor(TextSize size) {
@@ -401,6 +405,8 @@ void drawToast(const String& msg) {
   text(x + 12, H - 15, t, &FreeSansBold9pt7b, BLACK);
   displayFlush();
 }
+
+void drawCornerDots(JsonObjectConst s, int index, int count) { cornerDots(parseColor(s["accent"] | "", HOG), index, count); }
 
 GFXcanvas16* displayCanvas() { return canvas; }
 

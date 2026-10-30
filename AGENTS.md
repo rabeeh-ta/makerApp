@@ -42,6 +42,6 @@ Local development: `make api` and `make web-dev`, then open http://localhost:517
 ## Project notes (makerApp)
 
 - **The data-source poller is a goroutine, not a job.** `engine.Run` refreshes each HTTP source on its own interval, which can be as short as 15 seconds, and Sideyard jobs run at most once a minute. During a deploy both releases may poll for a few seconds; the writes are idempotent.
-- **Device-facing routes are a contract with flashed boards:** `/ws`, `/fw/…`, `/flash/…`, `/games/…` and `/push/{token}` keep their paths, methods and bytes. `TestDeviceFlow` in `e2e_test.go` guards them. A board keeps the server URL it was flashed with, so the domain can't change without re-flashing.
+- **Device-facing routes are a contract with flashed boards:** `/ws`, `/fw/…`, `/flash/…`, `/games/…`, `/anims/…` and `/push/{token}` keep their paths, methods and bytes. `TestDeviceFlow` in `e2e_test.go` guards them. A board keeps the server URL it was flashed with, so the domain can't change without re-flashing.
 - **Firmware** lives in `firmware/` (PlatformIO, built on a laptop with `make firmware`). Its output in `internal/fw/bin` is committed and embedded, so CI doesn't need PlatformIO.
 - `make test` also runs every Lua game through the firmware's VM (`make games-check`, which needs a C++ compiler).

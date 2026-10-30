@@ -183,6 +183,34 @@ var migrations = []string{
 		interval_sec INTEGER NOT NULL DEFAULT 10,
 		items TEXT NOT NULL DEFAULT '[]'
 	)`,
+	// Converted GIFs, about 60 KB each at most. Named by their content's hash, and
+	// never changed or removed while a board or a published app may still ask for one.
+	`CREATE TABLE animations (
+		hash TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		data BLOB NOT NULL,
+		created_at TEXT NOT NULL
+	)`,
+	// A CHECK can't be altered, so screens is rebuilt to allow the gif layout. Same
+	// columns, so the previous release keeps working, and no table references screens.
+	`CREATE TABLE screens_new (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		app_id TEXT,
+		app_pos INTEGER NOT NULL DEFAULT 0,
+		name TEXT NOT NULL,
+		source_id TEXT REFERENCES sources(id) ON DELETE SET NULL,
+		layout TEXT NOT NULL CHECK (layout IN ('big_number', 'list', 'text', 'spark', 'progress', 'gif')),
+		spec TEXT NOT NULL DEFAULT '{}',
+		updated_at TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	);
+	INSERT INTO screens_new (id, user_id, app_id, app_pos, name, source_id, layout, spec, updated_at, created_at)
+		SELECT id, user_id, app_id, app_pos, name, source_id, layout, spec, updated_at, created_at FROM screens;
+	DROP TABLE screens;
+	ALTER TABLE screens_new RENAME TO screens;
+	CREATE INDEX idx_screens_source ON screens(source_id);
+	CREATE INDEX idx_screens_app ON screens(app_id);`,
 }
 
 func migrate(db *sql.DB) error {

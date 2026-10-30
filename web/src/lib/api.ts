@@ -37,6 +37,13 @@ export function get<T>(path: string): Promise<T> {
   return call<T>(path)
 }
 
+// upload sends a file as multipart/form-data.
+export function upload<T>(path: string, file: File): Promise<T> {
+  const body = new FormData()
+  body.append('file', file)
+  return call<T>(path, { method: 'POST', body })
+}
+
 export function post<T = Done>(path: string, data?: FormData | Record<string, string>): Promise<T> {
   const body = new URLSearchParams()
   if (data instanceof FormData) {

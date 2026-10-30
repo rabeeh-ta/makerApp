@@ -922,3 +922,24 @@ func (s *Store) devicesForScreens(ctx context.Context, userID string, screenIDs 
 		JOIN devices d ON d.id = da.device_id WHERE (? = '' OR d.user_id = ?)
 		AND s.id IN (?`+strings.Repeat(",?", len(screenIDs)-1)+`)`, args...)
 }
+
+// SaveAnimation keeps a converted GIF. The same picture uploaded again stays one row.
+func (s *Store) SaveAnimation(ctx context.Context, hash, userID string, data []byte) error {
+	_, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO animations (hash, user_id, data, created_at) VALUES (?, ?, ?, ?)`,
+		hash, userID, data, iso(now()))
+	return err
+}
+
+// Animation returns a converted GIF's file.
+func (s *Store) Animation(ctx context.Context, hash string) ([]byte, error) {
+	var data []byte
+	err := s.db.QueryRowContext(ctx, `SELECT data FROM animations WHERE hash = ?`, hash).Scan(&data)
+	return data, err
+}
+
+// UserAnimationCount is how many GIFs a user has uploaded.
+func (s *Store) UserAnimationCount(ctx context.Context, userID string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM animations WHERE user_id = ?`, userID).Scan(&n)
+	return n, err
+}

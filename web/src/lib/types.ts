@@ -14,6 +14,7 @@ export type Screen = {
   items?: [string, string][]
   series?: number[]
   pct?: number
+  gif?: string
   name?: string
   error?: string
 }
@@ -97,6 +98,7 @@ export type Spec = {
   series_path: string
   pct_value: string
   pct_max: string
+  gif?: string
 }
 
 // SourceData is a source's latest response, as the source page shows it.

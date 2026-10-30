@@ -683,7 +683,7 @@ func (s *server) updateApp(ctx context.Context, req *mcp.CallToolRequest, in upd
 // screenFields are a screen's settings; in updates, only the fields given change.
 type screenFields struct {
 	Name       *string `json:"name,omitempty" jsonschema:"the screen's name in makerApp; defaults to the title"`
-	Layout     *string `json:"layout,omitempty" jsonschema:"big_number (default), list, text, spark or progress"`
+	Layout     *string `json:"layout,omitempty" jsonschema:"big_number (default), list, text, spark, progress or gif"`
 	SourceID   *string `json:"source_id,omitempty" jsonschema:"the data source its templates read; empty for fixed text"`
 	Title      *string `json:"title,omitempty" jsonschema:"header text (template)"`
 	Value      *string `json:"value,omitempty" jsonschema:"big_number, spark, progress: the main value (template)"`
@@ -697,6 +697,7 @@ type screenFields struct {
 	SeriesPath *string `json:"series_path,omitempty" jsonschema:"spark: path of a list of numbers, without braces"`
 	PctValue   *string `json:"pct_value,omitempty" jsonschema:"progress: the amount so far (template)"`
 	PctMax     *string `json:"pct_max,omitempty" jsonschema:"progress: the target (template)"`
+	GIF        *string `json:"gif,omitempty" jsonschema:"gif: the ID of a GIF uploaded in makerApp"`
 	Accent     *string `json:"accent,omitempty" jsonschema:"#RRGGBB color of the title and highlights"`
 	BG         *string `json:"bg,omitempty" jsonschema:"#RRGGBB background color"`
 }
@@ -709,7 +710,7 @@ func (f screenFields) apply(name, layout, source *string, spec *render.Spec) err
 	}{{name, f.Name}, {layout, f.Layout}, {source, f.SourceID}, {&spec.Title, f.Title}, {&spec.Value, f.Value},
 		{&spec.Sub, f.Sub}, {&spec.SubColor, f.SubColor}, {&spec.Body, f.Body}, {&spec.ItemsPath, f.ItemsPath},
 		{&spec.ItemLabel, f.ItemLabel}, {&spec.ItemValue, f.ItemValue}, {&spec.SeriesPath, f.SeriesPath},
-		{&spec.PctValue, f.PctValue}, {&spec.PctMax, f.PctMax}, {&spec.Accent, f.Accent}, {&spec.BG, f.BG}} {
+		{&spec.PctValue, f.PctValue}, {&spec.PctMax, f.PctMax}, {&spec.GIF, f.GIF}, {&spec.Accent, f.Accent}, {&spec.BG, f.BG}} {
 		if kv.v != nil {
 			*kv.dst = *kv.v
 		}

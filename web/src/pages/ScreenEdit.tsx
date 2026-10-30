@@ -2,7 +2,7 @@ import { Fragment, useRef, useState } from 'react'
 import { ErrorNotice, Loading, Notice } from '../components/common'
 import { DeviceScreen } from '../components/DeviceScreen'
 import { JsonTree } from '../components/JsonTree'
-import { get, post } from '../lib/api'
+import { get, post, upload } from '../lib/api'
 import { ago, layoutName, layouts, useTitle } from '../lib/format'
 import { Link, PostButton, useData, useForm, useLocation } from '../lib/router'
 import type { App, Device, Screen, Source, Spec, StoredScreen } from '../lib/types'
@@ -42,6 +42,26 @@ function Editor({ data, saved }: { data: Data; saved: boolean }) {
   const [preview, setPreview] = useState(data.Preview)
   const [explorer, setExplorer] = useState(data.Explorer)
   const { error, busy, submit } = useForm()
+  const [gif, setGif] = useState(sp.gif ?? '')
+  const [gifNote, setGifNote] = useState('')
+  const [gifError, setGifError] = useState('')
+  const [converting, setConverting] = useState(false)
+
+  function uploadGif(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setConverting(true)
+    setGifError('')
+    setGifNote('')
+    upload<{ hash: string; bytes: number }>('/api/animations', file)
+      .then((r) => {
+        setGif(r.hash)
+        setGifNote(`Converted: ${Math.ceil(r.bytes / 1024)} KB on the board.`)
+        schedulePreview(50)
+      })
+      .catch((err: Error) => setGifError(err.message))
+      .finally(() => setConverting(false))
+  }
 
   function refreshPreview() {
     if (!form.current) return
@@ -157,7 +177,20 @@ function Editor({ data, saved }: { data: Data; saved: boolean }) {
             </fieldset>
           </section>
 
-          <section className="card stack">
+          <section className="card stack" hidden={show('gif')}>
+            <h3>GIF</h3>
+            <input type="hidden" name="gif" value={gif} />
+            <label>
+              {gif ? 'Replace the GIF' : 'Pick a GIF'}
+              <input type="file" accept="image/gif" onChange={uploadGif} disabled={converting} />
+            </label>
+            {converting && <p className="muted small">Converting...</p>}
+            {gifNote && <p className="muted small">{gifNote}</p>}
+            {gifError && <p className="warn small">{gifError}</p>}
+            <p className="muted small">It fills the screen, cropped to fit, in 15 colors. Long GIFs lose frames to fit the board.</p>
+          </section>
+
+          <section className="card stack" hidden={layout === 'gif'}>
             <h3>Content</h3>
             <p className="muted small">
               Type text or click a field on the right.{' '}

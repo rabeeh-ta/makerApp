@@ -60,6 +60,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /flash/{hash}/{part}", s.flashPart)
 	mux.HandleFunc("POST /push/{token}", s.pushData)
 	mux.HandleFunc("GET /games/{id}/{file}", s.gameScript)
+	mux.HandleFunc("GET /anims/{file}", s.animFile)
 
 	// Accounts
 	mux.HandleFunc("GET /api/me", s.me)
@@ -115,6 +116,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/screens/new", s.auth(s.screenEdit))
 	mux.HandleFunc("POST /api/screens", s.auth(s.saveScreen))
 	mux.HandleFunc("POST /api/screens/preview", s.auth(s.previewScreen))
+	mux.HandleFunc("POST /api/animations", s.auth(s.uploadAnimation))
 	mux.HandleFunc("GET /api/screens/explorer", s.auth(s.explorer))
 	mux.HandleFunc("GET /api/screens/{id}", s.auth(s.screenEdit))
 	mux.HandleFunc("POST /api/screens/{id}", s.auth(s.saveScreen))

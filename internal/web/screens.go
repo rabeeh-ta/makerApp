@@ -113,6 +113,7 @@ func specFromForm(r *http.Request) (string, render.Spec) {
 		SeriesPath: strings.TrimSpace(r.FormValue("series_path")),
 		PctValue:   r.FormValue("pct_value"),
 		PctMax:     r.FormValue("pct_max"),
+		GIF:        strings.TrimSpace(r.FormValue("gif")),
 	}
 	if spec.BG == "#000000" {
 		spec.BG = ""

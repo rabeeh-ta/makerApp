@@ -12,11 +12,15 @@ namespace {
 constexpr uint32_t STORE_OFFSET = 0x3E0000;
 constexpr uint32_t STORE_SIZE = 0x20000;
 constexpr size_t MAX_GAME_BYTES = 32 * 1024;
+constexpr size_t MAX_ANIM_BYTES = 64 * 1024;
+constexpr size_t SPARE_BYTES = 8 * 1024;  // LittleFS needs some free blocks to work in
 
 bool mounted = false;
+bool full = false;
 
 String pathOf(const GameRef& g) { return "/" + g.id + "-" + g.hash + ".lua"; }
 String valuesPath(const String& id) { return "/" + id + ".save"; }
+String animPath(const String& hash) { return "/" + hash + ".anm"; }
 
 // Saved values are stored one per line as key<TAB>value, with \\, \t and \n escaped.
 String escape(const String& s) {
@@ -48,8 +52,7 @@ String unescape(const String& s) {
   return out;
 }
 
-bool download(const GameRef& g, const String& base, const char* ca) {
-  String url = base + "/games/" + g.id + "/" + g.hash + ".lua";
+bool download(const String& url, const String& path, size_t maxBytes, const char* ca) {
   WiFiClientSecure secure;
   WiFiClient plain;
   bool tls = url.startsWith("https://");
@@ -59,8 +62,14 @@ bool download(const GameRef& g, const String& base, const char* ca) {
   if (!http.begin(tls ? (WiFiClient&)secure : plain, url)) return false;
   int status = http.GET();
   int len = http.getSize();  // -1 when the reply is chunked (no length given)
-  if (status != 200 || len == 0 || len > (int)MAX_GAME_BYTES) {
-    Serial.printf("makerDevice: game %s download failed (%d, %d bytes)\n", g.id.c_str(), status, len);
+  if (status != 200 || len == 0 || len > (int)maxBytes) {
+    Serial.printf("makerDevice: %s download failed (%d, %d bytes)\n", path.c_str(), status, len);
+    http.end();
+    return false;
+  }
+  if (len > 0 && LittleFS.usedBytes() + len + SPARE_BYTES > LittleFS.totalBytes()) {
+    Serial.printf("makerDevice: no room for %s (%d bytes)\n", path.c_str(), len);
+    full = true;
     http.end();
     return false;
   }
@@ -73,12 +82,12 @@ bool download(const GameRef& g, const String& base, const char* ca) {
   int written = http.writeToStream(&f);
   f.close();
   http.end();
-  bool complete = written > 0 && (size_t)written <= MAX_GAME_BYTES && (len < 0 || written == len);
-  if (!complete || !LittleFS.rename("/download.tmp", pathOf(g))) {
+  bool complete = written > 0 && (size_t)written <= maxBytes && (len < 0 || written == len);
+  if (!complete || !LittleFS.rename("/download.tmp", path)) {
     LittleFS.remove("/download.tmp");
     return false;
   }
-  Serial.printf("makerDevice: installed game %s (%d bytes)\n", g.id.c_str(), written);
+  Serial.printf("makerDevice: installed %s (%d bytes)\n", path.c_str(), written);
   return true;
 }
 
@@ -109,15 +118,18 @@ bool gameStoreRead(const GameRef& g, String& source) {
   return source.length() > 0;
 }
 
-bool gameStoreSync(const std::vector<GameRef>& wanted, const String& base, const char* ca) {
+bool gameStoreSync(const std::vector<GameRef>& wanted, const std::vector<String>& anims, const String& base,
+                   const char* ca) {
   if (!mounted) return false;
-  // Remove games that are no longer installed, old versions and leftovers.
+  full = false;
+  // Remove what's no longer installed, old versions and leftovers.
   std::vector<String> stale;
   File root = LittleFS.open("/");
   for (File f = root.openNextFile(); f; f = root.openNextFile()) {
     String name = "/" + String(f.name());
     bool keep = false;
     for (const GameRef& g : wanted) keep = keep || name == pathOf(g) || name == valuesPath(g.id);
+    for (const String& hash : anims) keep = keep || name == animPath(hash);
     if (!keep) stale.push_back(name);
   }
   root.close();
@@ -125,10 +137,22 @@ bool gameStoreSync(const std::vector<GameRef>& wanted, const String& base, const
 
   bool ok = true;
   for (const GameRef& g : wanted) {
-    if (!LittleFS.exists(pathOf(g))) ok = download(g, base, ca) && ok;
+    String url = base + "/games/" + g.id + "/" + g.hash + ".lua";
+    if (!LittleFS.exists(pathOf(g))) ok = download(url, pathOf(g), MAX_GAME_BYTES, ca) && ok;
+  }
+  for (const String& hash : anims) {
+    if (!LittleFS.exists(animPath(hash))) ok = download(base + "/anims/" + hash + ".anm", animPath(hash), MAX_ANIM_BYTES, ca) && ok;
   }
   return ok;
 }
+
+bool gameStoreOpenAnim(const String& hash, File& file) {
+  if (!mounted || hash.isEmpty() || !LittleFS.exists(animPath(hash))) return false;
+  file = LittleFS.open(animPath(hash), FILE_READ);
+  return (bool)file;
+}
+
+bool gameStoreFull() { return full; }
 
 bool gameStoreLoadValues(const String& id, std::map<String, String>& values) {
   values.clear();

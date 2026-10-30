@@ -25,6 +25,12 @@ func Check(s Screen, spec Spec, data string, screens int) []string {
 	if screens > 1 {
 		dots = screens * 9
 	}
+	if s.Layout == "gif" {
+		if s.GIF == "" {
+			add("No GIF yet: upload one on this screen's page in makerApp.")
+		}
+		return out
+	}
 	if cut, n := fits(bold9, s.Title, screenW-20-dots); !cut {
 		add("Title %q is cut to %q on the board; keep it to about %d characters.", s.Title, bold9.ellipsize(s.Title, screenW-20-dots), n)
 	}

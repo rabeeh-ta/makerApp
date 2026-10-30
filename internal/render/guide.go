@@ -26,7 +26,8 @@ Layouts:
 - list: rows from a list in the data. items_path points at the list; item_label and item_value are templates evaluated against each item (paths relative to the item). %d rows a page, the board pages through the rest; max_items caps the rows (default 10, at most 30). Labels are cut to fit beside the value.
 - text: up to %d characters of text, wrapped to about %d characters a line, %d lines a page.
 - spark: a value (about %d digits) above a line chart of a list of numbers; series_path points at that list.
-- progress: a value, a bar filled pct_value out of pct_max, and a subtitle.`,
+- progress: a value, a bar filled pct_value out of pct_max, and a subtitle.
+- gif: a looping GIF filling the whole screen, with no title. The user uploads it on the screen's page in makerApp; the gif field holds what the upload gives back. It's cropped to fit and brought down to 15 colors, and long GIFs lose frames to fit the board.`,
 		fitCount(bold9, "n", screenW-20),
 		fitCount(bold24, "8", screenW-16), fitCount(bold18, "8", screenW-16),
 		fitCount(sans9, "n", screenW-16),

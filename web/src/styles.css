@@ -210,6 +210,8 @@ a.tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); colo
 .lo-text::before { left: 6px; right: 8px; top: 8px; height: 2px; background: #888; box-shadow: 0 5px #888, 0 10px #888, 0 15px #888; }
 .lo-spark::before { left: 6px; right: 6px; bottom: 6px; height: 12px; background: none; border-bottom: 2px solid var(--accent); transform: skewY(-12deg); }
 .lo-spark::after { left: 6px; top: 5px; width: 18px; height: 6px; background: #fff; }
+.lo-gif::before { left: 6px; right: 6px; top: 5px; bottom: 5px; background: #333; border-radius: 2px; }
+.lo-gif::after { left: 19px; top: 11px; width: 0; height: 0; background: none; border-style: solid; border-width: 6px 0 6px 10px; border-color: transparent transparent transparent var(--accent); }
 .lo-progress::before { left: 6px; right: 6px; top: 18px; height: 5px; background: #333; border-radius: 3px; }
 .lo-progress::after { left: 6px; width: 26px; top: 18px; height: 5px; border-radius: 3px; }
 .btn-row { align-items: center; }
@@ -249,6 +251,7 @@ pre.json { background: #121211; color: #e5e3dc; padding: 14px; border-radius: 8p
 .lcd-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lcd-row b { color: var(--accent); white-space: nowrap; }
 .lcd-text { position: absolute; left: 8px; right: 12px; top: 32px; font-size: 12.5px; line-height: 19px; white-space: pre-wrap; overflow: hidden; height: 98px; }
+.lcd-gif { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
 .lcd-spark { position: absolute; left: 8px; right: 8px; bottom: 6px; height: 64px; width: 224px; overflow: visible; }
 .lcd-spark polyline { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .lcd-bar { position: absolute; left: 8px; right: 8px; top: 88px; height: 14px; border-radius: 7px; background: #333; overflow: hidden; }

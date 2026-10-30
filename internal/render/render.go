@@ -17,10 +17,12 @@ import (
 	"time"
 
 	"github.com/tidwall/gjson"
+
+	"makerapp/internal/anim"
 )
 
 // Layouts a screen can use. The firmware also draws "clock" for the built-in Clock app.
-var Layouts = []string{"big_number", "list", "text", "spark", "progress"}
+var Layouts = []string{"big_number", "list", "text", "spark", "progress", "gif"}
 
 type Spec struct {
 	Title      string `json:"title"`
@@ -37,6 +39,7 @@ type Spec struct {
 	SeriesPath string `json:"series_path"`
 	PctValue   string `json:"pct_value"`
 	PctMax     string `json:"pct_max"`
+	GIF        string `json:"gif"` // the hash of an uploaded animation (internal/anim)
 }
 
 func DefaultSpec(layout string) Spec {
@@ -69,6 +72,7 @@ type Screen struct {
 	Live     bool        `json:"live,omitempty"` // contains {$field} markers the device fills in
 	Game     string      `json:"game,omitempty"` // layout "game": the Lua game to run
 	Hash     string      `json:"hash,omitempty"` // and its version, which the board downloads
+	GIF      string      `json:"gif,omitempty"`  // layout "gif": the animation the board downloads
 	Error    string      `json:"-"`              // source error, shown in the web UI only
 }
 
@@ -117,6 +121,10 @@ func Render(id, name, layout string, spec Spec, c Context) Screen {
 		out.Value = ASCII(ev(spec.Value))
 		out.Sub = ASCII(ev(spec.Sub))
 		out.Pct = pct(ev(spec.PctValue), ev(spec.PctMax))
+	case "gif":
+		if anim.ValidHash(spec.GIF) {
+			out.GIF = spec.GIF
+		}
 	default:
 		out.Layout = "big_number"
 		out.Value = ASCII(ev(spec.Value))

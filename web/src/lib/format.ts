@@ -26,10 +26,10 @@ export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`
 }
 
-export const layouts = ['big_number', 'list', 'text', 'spark', 'progress']
+export const layouts = ['big_number', 'list', 'text', 'spark', 'progress', 'gif']
 
 export function layoutName(l: string): string {
-  return ({ big_number: 'Big number', list: 'List', text: 'Text', spark: 'Sparkline', progress: 'Progress' } as Record<string, string>)[l] ?? ''
+  return ({ big_number: 'Big number', list: 'List', text: 'Text', spark: 'Sparkline', progress: 'Progress', gif: 'GIF' } as Record<string, string>)[l] ?? ''
 }
 
 export function cycleName(sec: number): string {

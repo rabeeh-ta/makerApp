@@ -14,6 +14,7 @@
 
 #include <vector>
 
+#include "anim.h"
 #include "certs.h"
 #include "config.h"
 #include "display.h"
@@ -45,6 +46,10 @@ bool shownClock = false;  // what's on screen, so the loop knows when to redraw
 bool shownLive = false;
 bool shownGame = false;
 String activeGame;        // id + hash of the game on screen, "" when none
+String activeAnim;        // hash of the GIF on screen, "" when none
+bool shownAnim = false;   // a GIF is playing, with these place dots and this screen's accent
+int animIndex = 0, animCount = 1;
+JsonDocument animScreen;
 bool gamesSyncDue = false;  // installed games changed: fetch or delete game files
 uint32_t gamesRetryAt = 0;  // when to retry a download that failed
 int lastMinute = -1;            // clock redraws once a minute
@@ -244,9 +249,47 @@ void renderSettings() {
   lastSettingsDraw = millis();
 }
 
-// Draws pages[i]: a clock, a screen with device fields filled in, or any other.
+// Pushes the GIF's current frame with what goes on top of it.
+void showAnimFrame() {
+  animBlit();
+  drawCornerDots(animScreen.as<JsonObjectConst>(), animIndex, animCount);
+  if (toastUntil && millis() < toastUntil)
+    drawToast(toastText);
+  else
+    displayFlush();
+}
+
+// A GIF screen, or a note while its file isn't on the board.
+void drawGif(JsonObjectConst screen, int i, int count) {
+  String hash = screen["gif"] | "";
+  if (activeAnim != hash) {
+    activeAnim = animOpen(hash) ? hash : "";
+  }
+  if (activeAnim.isEmpty()) {
+    JsonDocument note;
+    note["layout"] = "text";
+    note["title"] = screen["title"] | "GIF";
+    note["accent"] = screen["accent"] | "";
+    note["body"] = hash.isEmpty()     ? "No GIF picked yet. Add one in makerApp."
+                   : gameStoreFull() ? "No room for this GIF. Uninstall an app to free up space."
+                                     : "Getting this GIF...";
+    drawScreen(note.as<JsonObjectConst>(), 0, i, count);
+    return;
+  }
+  shownAnim = true;
+  animIndex = i;
+  animCount = count;
+  animScreen.set(screen);
+  showAnimFrame();
+}
+
+// Draws pages[i]: a clock, a GIF, a screen with device fields filled in, or any other.
 void drawPage(const std::vector<Page>& pages, int i) {
   JsonObjectConst screen = pages[i].screen;
+  if (String(screen["layout"] | "") == "gif") {
+    drawGif(screen, i, pages.size());
+    return;
+  }
   if (String(screen["layout"] | "") == "clock") {
     shownClock = true;
     drawClockNow(screen);
@@ -306,7 +349,7 @@ void renderApp(JsonObjectConst app) {
 }
 
 void render() {
-  shownClock = shownLive = shownGame = false;
+  shownClock = shownLive = shownGame = shownAnim = false;
   switch (mode) {
     case Mode::Setup:
       // Phone-friendly instructions: the hotspot works without any computer.
@@ -349,6 +392,10 @@ void render() {
   if (!shownGame && !activeGame.isEmpty()) {
     gameClose();  // frees the game's memory
     activeGame = "";
+  }
+  if (!shownAnim && !activeAnim.isEmpty()) {
+    animClose();  // frees its memory
+    activeAnim = "";
   }
   if (toastUntil && millis() < toastUntil) drawToast(toastText);
 }
@@ -586,19 +633,22 @@ void doOta(const String& url) {
   ESP.restart();
 }
 
-// Keeps the game files on the board in line with the installed game apps:
-// downloads new ones and new versions, deletes uninstalled ones.
+// Keeps the files on the board in line with the installed game apps and GIF
+// screens: downloads new ones and new versions, deletes uninstalled ones.
 void syncGames() {
   gamesSyncDue = false;
   gamesRetryAt = 0;
   if (state["apps"].isNull()) return;  // no app list yet: don't delete anything
   std::vector<GameRef> wanted;
+  std::vector<String> anims;
   for (JsonObjectConst a : apps()) {
     for (JsonObjectConst s : a["screens"].as<JsonArrayConst>()) {
-      if (isGameLayout(s["layout"] | "")) wanted.push_back({s["game"] | "", s["hash"] | ""});
+      String layout = s["layout"] | "";
+      if (isGameLayout(layout)) wanted.push_back({s["game"] | "", s["hash"] | ""});
+      if (layout == "gif" && !String(s["gif"] | "").isEmpty()) anims.push_back(s["gif"] | "");
     }
   }
-  if (!gameStoreSync(wanted, configWebBase(), ROOT_CAS)) gamesRetryAt = millis() + 30000;
+  if (!gameStoreSync(wanted, anims, configWebBase(), ROOT_CAS)) gamesRetryAt = millis() + 30000;
   dirty = true;
 }
 
@@ -784,6 +834,7 @@ void loop() {
 
   tick();
   if (shownGame) gameTick();
+  if (shownAnim && !dirty && animStep()) showAnimFrame();
   if ((gamesSyncDue || (gamesRetryAt && millis() > gamesRetryAt)) && wsConnected) syncGames();
   if (toastUntil && millis() >= toastUntil) {
     toastUntil = 0;

@@ -8,7 +8,7 @@ export function DeviceScreen({ s, big }: { s: Screen; big?: boolean }) {
   return (
     <>
       <div className={big ? 'lcd lcd-big' : 'lcd'} style={style}>
-        <div className="lcd-title">{s.title}</div>
+        {s.layout !== 'gif' && <div className="lcd-title">{s.title}</div>}
         <Body s={s} />
       </div>
       {big && s.error && <p className="warn small">Source error: {s.error}</p>}
@@ -18,6 +18,8 @@ export function DeviceScreen({ s, big }: { s: Screen; big?: boolean }) {
 
 function Body({ s }: { s: Screen }) {
   switch (s.layout) {
+    case 'gif':
+      return s.gif ? <img className="lcd-gif" src={`/anims/${s.gif}.gif`} alt="" /> : <div className="lcd-text">No GIF yet</div>
     case 'list':
       return (
         <div className="lcd-list">

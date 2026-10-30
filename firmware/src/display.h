@@ -34,6 +34,9 @@ void drawScreen(JsonObjectConst s, int part, int index, int count);
 
 void drawToast(const String& text);
 
+// A GIF screen: the corner dots drawn over its picture, in the screen's accent.
+void drawCornerDots(JsonObjectConst s, int index, int count);
+
 // Launcher building blocks: the built-in Clock, the Apps drawer and Settings.
 void drawClock(const String& title, const String& hhmm, const String& date);
 void drawMenu(const String& title, const std::vector<String>& items, int selected, const String& hint = "");
