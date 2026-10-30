@@ -18,7 +18,7 @@ import (
 // ordered sets of screens made here; the App Store (store.go) lists the ones
 // anyone can install.
 
-var cycleOpts = []int{0, 10, 20, 30, 60, 300}
+var cycleOpts = []int{0, 5, 10, 20, 30, 60, 300}
 
 type appCard struct {
 	*store.App
