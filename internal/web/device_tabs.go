@@ -23,9 +23,10 @@ func (s *Server) loadDevice(w http.ResponseWriter, r *http.Request) (*store.Devi
 }
 
 type screenCard struct {
-	S     *webScreen
-	First bool
-	Last  bool
+	S      *webScreen
+	First  bool
+	Last   bool
+	Hidden bool
 }
 
 type installedCard struct {

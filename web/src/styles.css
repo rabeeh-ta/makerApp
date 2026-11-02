@@ -365,6 +365,7 @@ a.card:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
 /* Screen cards with actions */
 .screen-card { display: flex; flex-direction: column; gap: 8px; }
 .screen-card .card-actions { margin-top: auto; }
+.hidden-screen .device-thumb { opacity: 0.35; }
 .screen-link { text-decoration: none; display: flex; flex-direction: column; gap: 6px; }
 .screen-link:hover strong { color: var(--accent); }
 .card-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--line); margin-top: 4px; }

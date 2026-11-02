@@ -216,6 +216,8 @@ var migrations = []string{
 		user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
 		items TEXT NOT NULL DEFAULT '[]'
 	)`,
+	// A hidden screen stays in its app but isn't sent to boards.
+	`ALTER TABLE screens ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0`,
 }
 
 func migrate(db *sql.DB) error {

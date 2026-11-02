@@ -101,6 +101,7 @@ func (s *Server) storeApp(w http.ResponseWriter, r *http.Request) {
 			by = u.Username
 		}
 		screens, _ := s.st.AppScreens(ctx, a.ID)
+		screens = slices.DeleteFunc(screens, func(sc *store.Screen) bool { return sc.Hidden })
 		var shots []*webScreen
 		for _, sc := range s.eng.PreviewScreensFor(ctx, screens, u.ID) {
 			shots = append(shots, toWeb(sc))

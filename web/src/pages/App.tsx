@@ -6,7 +6,7 @@ import type { App, Device, Screen } from '../lib/types'
 
 type Data = {
   App: App
-  Screens: { S: Screen; First: boolean; Last: boolean }[] | null
+  Screens: { S: Screen; First: boolean; Last: boolean; Hidden: boolean }[] | null
   Devices: (Device & { Installed: boolean; Online: boolean })[] | null
   CycleOpts: number[]
 }
@@ -68,15 +68,15 @@ export function AppPage({ id }: { id: string }) {
           </div>
           {screens.length ? (
             <div className="grid cards">
-              {screens.map(({ S, First, Last }) => (
-                <div className="card screen-card" key={S.id}>
+              {screens.map(({ S, First, Last, Hidden }) => (
+                <div className={Hidden ? 'card screen-card hidden-screen' : 'card screen-card'} key={S.id}>
                   <Link className="screen-link" to={`/screens/${S.id}`}>
                     <div className="device-thumb">
                       <DeviceScreen s={S} />
                     </div>
                     <div className="row between">
                       <strong>{S.name}</strong>
-                      <span className="muted small">{layoutName(S.layout)}</span>
+                      <span className="muted small">{Hidden ? 'Hidden' : layoutName(S.layout)}</span>
                     </div>
                   </Link>
                   <div className="card-actions">
@@ -87,6 +87,9 @@ export function AppPage({ id }: { id: string }) {
                       ↓
                     </PostButton>
                     <span className="grow" />
+                    <PostButton action={`/api/apps/${app.ID}/screens/${S.id}/hide`} data={{ hidden: Hidden ? '0' : '1' }} className="btn ghost small" title={Hidden ? 'Show it on boards again' : "Keep it here but don't show it on boards"}>
+                      {Hidden ? 'Show' : 'Hide'}
+                    </PostButton>
                     <Link className="btn ghost small" to={`/screens/${S.id}`}>Edit</Link>
                     <PostButton action={`/api/screens/${S.id}/delete`} className="btn danger small" confirm={`Delete “${S.name}”?`}>
                       Delete

@@ -512,6 +512,9 @@ func (e *Engine) DeviceApps(ctx context.Context, dev *store.Device, preview bool
 			Catalog: a.UserID != dev.UserID, By: by}
 		screens, _ := e.st.AppScreens(ctx, a.ID)
 		for _, sc := range screens {
+			if sc.Hidden {
+				continue
+			}
 			v.Screens = append(v.Screens, e.renderScreen(ctx, sc, cache, preview, dev.UserID))
 		}
 		out = append(out, v)

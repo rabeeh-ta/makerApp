@@ -562,13 +562,14 @@ type Screen struct {
 	UpdatedAt int64
 	CreatedAt int64
 	AppID     string // the app this screen belongs to
+	Hidden    bool   // kept in the app, left off boards
 }
 
-const screenCols = `id, user_id, name, COALESCE(source_id, ''), layout, spec, unixepoch(updated_at), unixepoch(created_at), COALESCE(app_id, '')`
+const screenCols = `id, user_id, name, COALESCE(source_id, ''), layout, spec, unixepoch(updated_at), unixepoch(created_at), COALESCE(app_id, ''), hidden`
 
 func scanScreen(row interface{ Scan(...any) error }) (*Screen, error) {
 	x := &Screen{}
-	err := row.Scan(&x.ID, &x.UserID, &x.Name, &x.SourceID, &x.Layout, &x.Spec, &x.UpdatedAt, &x.CreatedAt, &x.AppID)
+	err := row.Scan(&x.ID, &x.UserID, &x.Name, &x.SourceID, &x.Layout, &x.Spec, &x.UpdatedAt, &x.CreatedAt, &x.AppID, &x.Hidden)
 	return x, notFound(err)
 }
 
@@ -627,6 +628,12 @@ func (s *Store) SaveScreen(ctx context.Context, x *Screen) error {
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE screens SET name = ?, source_id = ?, layout = ?, spec = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?`, x.Name, src, x.Layout, x.Spec, iso(x.UpdatedAt), x.ID, x.UserID)
+	return err
+}
+
+func (s *Store) SetScreenHidden(ctx context.Context, userID, id string, hidden bool) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE screens SET hidden = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+		hidden, iso(now()), id, userID)
 	return err
 }
 

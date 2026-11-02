@@ -114,7 +114,7 @@ func (s *Server) app(w http.ResponseWriter, r *http.Request) {
 	counts, _ := s.st.InstallCounts(r.Context())
 	cards := make([]screenCard, len(screens))
 	for i, sc := range s.eng.PreviewScreens(r.Context(), screens) {
-		cards[i] = screenCard{S: toWeb(sc), First: i == 0, Last: i == len(screens)-1}
+		cards[i] = screenCard{S: toWeb(sc), First: i == 0, Last: i == len(screens)-1, Hidden: screens[i].Hidden}
 	}
 	devices, _ := s.st.UserDevices(r.Context(), a.UserID)
 	on, _ := s.st.DevicesWithApp(r.Context(), a.ID)
@@ -241,6 +241,25 @@ func (s *Server) moveAppScreen(w http.ResponseWriter, r *http.Request) {
 	appID := r.PathValue("id")
 	if failed(w, s.lib.MoveScreen(r.Context(), currentUser(r).ID, appID, r.PathValue("sid"), delta)) {
 		return
+	}
+	redirect(w, "/apps/"+appID)
+}
+
+// hideAppScreen hides a screen from boards, or shows it again, keeping it in the app.
+func (s *Server) hideAppScreen(w http.ResponseWriter, r *http.Request) {
+	u, appID := currentUser(r), r.PathValue("id")
+	sc, err := s.st.UserScreen(r.Context(), u.ID, r.PathValue("sid"))
+	if err != nil || sc.AppID != appID {
+		fail(w, http.StatusNotFound, "not found")
+		return
+	}
+	if err := s.st.SetScreenHidden(r.Context(), u.ID, sc.ID, r.FormValue("hidden") == "1"); err != nil {
+		fail(w, http.StatusInternalServerError, "server error")
+		return
+	}
+	devices, _ := s.st.DevicesWithApp(r.Context(), appID)
+	for _, d := range devices {
+		s.eng.PushDevice(r.Context(), d)
 	}
 	redirect(w, "/apps/"+appID)
 }
